@@ -31,10 +31,13 @@ if [ $# -gt 0 ]; then
     shift
 fi
 
+dispatch_middleware "dm-player.sh" "$ACTION" "$@" && exit $?
+
 case "$ACTION" in
     ""|"-h"|"--help"|"help")
         show_usage
-        exit 0
+        dispatch_middleware_help "dm-player.sh"
+        true
         ;;
 
     "show")
@@ -195,9 +198,11 @@ case "$ACTION" in
     *)
         error "Unknown action: $ACTION"
         show_usage
-        exit 1
+        dispatch_middleware_help "dm-player.sh"
+        false
         ;;
 esac
 
-# Propagate Python exit code
-exit $?
+CORE_RC=$?
+dispatch_middleware_post "dm-player.sh" "$ACTION" "$@"
+exit $CORE_RC

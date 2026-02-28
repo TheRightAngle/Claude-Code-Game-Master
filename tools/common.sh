@@ -261,3 +261,14 @@ load_dotenv_file() {
 }
 
 load_dotenv_file "$PROJECT_ROOT/.env"
+
+# --- Module middleware dispatch ---
+# Source advanced dispatch when modules infrastructure exists; otherwise no-op.
+_ADVANCED_SH="$PROJECT_ROOT/.claude/modules/infrastructure/common-advanced.sh"
+if [ -f "$_ADVANCED_SH" ]; then
+    source "$_ADVANCED_SH"
+else
+    dispatch_middleware()      { return 1; }
+    dispatch_middleware_post() { :; }
+    dispatch_middleware_help() { :; }
+fi

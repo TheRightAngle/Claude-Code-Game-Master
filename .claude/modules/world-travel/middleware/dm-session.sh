@@ -62,7 +62,7 @@ NAV_RC=$?
 
 [ $NAV_RC -eq 0 ] || exit $NAV_RC  # Propagate navigation failure to caller.
 
-NAV_PARSED=$(echo "$NAV_OUTPUT" | python3 -c "
+NAV_PARSED=$(echo "$NAV_OUTPUT" | uv run python -c "
 import json
 import sys
 
@@ -103,7 +103,7 @@ if [ -n "$DISTANCE_METERS" ] && [ "$DISTANCE_METERS" -gt 0 ] 2>/dev/null; then
     echo "  Distance: ${DISTANCE_METERS}m"
 fi
 if [ -n "$ELAPSED_HOURS" ] && [ "$ELAPSED_HOURS" != "0" ]; then
-    python3 - "$ELAPSED_HOURS" <<'PYCODE'
+    uv run python - "$ELAPSED_HOURS" <<'PYCODE'
 import sys
 print(f"  Travel time: {float(sys.argv[1]):.2f} hours")
 PYCODE
@@ -115,7 +115,7 @@ if [ -n "$DISTANCE_METERS" ] && [ "$DISTANCE_METERS" -gt 0 ] 2>/dev/null; then
     ACTIVE=$(cat "$PROJECT_ROOT/world-state/active-campaign.txt" 2>/dev/null)
     FROM_LOC=""
     if [ -n "$ACTIVE" ]; then
-        FROM_LOC=$(python3 -c "
+        FROM_LOC=$(uv run python -c "
 import json
 try:
     with open('$PROJECT_ROOT/world-state/campaigns/$ACTIVE/campaign-overview.json') as f:

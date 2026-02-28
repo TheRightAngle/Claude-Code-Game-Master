@@ -15,8 +15,12 @@ TIME_OF_DAY="$1"
 shift
 DATE="$*"
 
+dispatch_middleware "dm-time.sh" "$TIME_OF_DAY" "$DATE" && exit $?
+
 (
     cd "$PROJECT_ROOT" || exit 1
     $PYTHON_CMD -m lib.time_manager update "$TIME_OF_DAY" "$DATE"
 )
-exit $?
+CORE_RC=$?
+dispatch_middleware_post "dm-time.sh" "$TIME_OF_DAY" "$DATE"
+exit $CORE_RC
