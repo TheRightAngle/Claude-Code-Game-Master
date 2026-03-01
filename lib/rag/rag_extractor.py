@@ -236,12 +236,16 @@ class RAGExtractor:
                 "document": self._document_name or "unknown",
             })
 
+        # Continue ID sequence from existing vectors to avoid collisions
+        # when clear_existing=False and extraction is run multiple times.
+        id_offset = self.vector_store.count()
+
         # Store all chunks
         self.vector_store.add_chunks(
             chunks=chunks,
             embeddings=[emb.tolist() for emb in embeddings],
             metadatas=metadatas,
-            ids=[f"doc_{i:04d}" for i in range(len(chunks))]
+            ids=[f"doc_{id_offset + i:04d}" for i in range(len(chunks))]
         )
 
 

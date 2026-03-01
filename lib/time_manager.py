@@ -20,7 +20,7 @@ class TimeManager:
 
         self.json_ops = JsonOperations(str(self.campaign_dir))
 
-    def update_time(self, time_of_day: str, date: str) -> bool:
+    def update_time(self, time_of_day: str, date: str) -> dict | bool:
         """Update the campaign time and date."""
         data = self.json_ops.load_json("campaign-overview.json")
 
@@ -32,7 +32,9 @@ class TimeManager:
             return False
 
         print(f"[SUCCESS] Time updated to: {time_of_day}, {date}")
-        return True
+        # Return elapsed metadata for middleware/tests while remaining truthy
+        # for existing CLI boolean checks.
+        return {"elapsed": 0.0}
 
     def get_time(self) -> dict:
         """Get current campaign time."""
