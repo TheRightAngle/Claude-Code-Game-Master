@@ -93,6 +93,34 @@ class TestMoveParty:
         forest_connections = [c["to"] for c in locations["Forest"].get("connections", [])]
         assert "Town" in forest_connections
 
+    def test_move_handles_malformed_connection_entries(self, tmp_path):
+        ws, camp = make_world_state(tmp_path, overview_extra={
+            "player_position": {"current_location": "Town"}
+        })
+        (camp / "locations.json").write_text(
+            json.dumps(
+                {
+                    "Town": {
+                        "connections": ["bad-entry", {"path": "unknown"}, {"to": "Road"}],
+                        "position": "center",
+                        "description": ""
+                    }
+                },
+                ensure_ascii=False,
+            )
+        )
+
+        mgr = SessionManager(ws)
+        mgr.move_party("Forest")
+
+        locations = json.loads((camp / "locations.json").read_text())
+        town_targets = [
+            c.get("to")
+            for c in locations["Town"].get("connections", [])
+            if isinstance(c, dict)
+        ]
+        assert "Forest" in town_targets
+
 
 class TestGetContext:
     def test_get_full_context_returns_string(self, tmp_path):
@@ -147,6 +175,16 @@ class TestGetContext:
 
 
 class TestSavePathTraversal:
+    def test_create_save_sanitizes_slashes_in_name(self, tmp_path):
+        ws, camp = make_world_state(tmp_path)
+        mgr = SessionManager(ws)
+
+        filename = mgr.create_save("Chapter/One")
+
+        assert "/" not in filename
+        assert "\\" not in filename
+        assert (camp / "saves" / filename).exists()
+
     def test_restore_save_rejects_traversal_name(self, tmp_path):
         ws, camp = make_world_state(tmp_path)
         outside_file = camp / "outside-save.json"
@@ -163,6 +201,35 @@ class TestSavePathTraversal:
         mgr = SessionManager(ws)
         assert mgr.delete_save("../outside-save.json") is False
         assert outside_file.exists()
+
+    def test_restore_save_returns_false_when_snapshot_write_fails(self, tmp_path, monkeypatch):
+        ws, camp = make_world_state(tmp_path)
+        mgr = SessionManager(ws)
+
+        save_file = camp / "saves" / "bad-write.json"
+        save_file.parent.mkdir(parents=True, exist_ok=True)
+        save_file.write_text(
+            json.dumps(
+                {
+                    "snapshot": {
+                        "campaign_overview": {"campaign_name": "Recovered"},
+                        "locations": {"Town": {"connections": []}}
+                    }
+                },
+                ensure_ascii=False,
+            )
+        )
+
+        real_save_json = mgr.json_ops.save_json
+
+        def fail_locations(filename, data, indent=2):
+            if filename == "locations.json":
+                return False
+            return real_save_json(filename, data, indent=indent)
+
+        monkeypatch.setattr(mgr.json_ops, "save_json", fail_locations)
+
+        assert mgr.restore_save("bad-write") is False
 
 
 class TestSessionStartEnd:

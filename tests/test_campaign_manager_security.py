@@ -62,3 +62,15 @@ class TestCampaignPathTraversalProtection:
         (ws / "active-campaign.txt").write_text("../../escaped-campaign")
 
         assert mgr.get_active_campaign_dir() is None
+
+    def test_get_info_rejects_traversal_name(self, tmp_path):
+        ws = make_world_state(tmp_path)
+        mgr = CampaignManager(str(ws))
+
+        outside = tmp_path / "escaped-campaign"
+        outside.mkdir()
+        (outside / "campaign-overview.json").write_text(
+            json.dumps({"campaign_name": "Escaped"}, ensure_ascii=False)
+        )
+
+        assert mgr.get_info("../../escaped-campaign") is None

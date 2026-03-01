@@ -60,7 +60,7 @@ class DiceRoller:
         notation = notation.strip()
         
         # Check for advantage (keep highest)
-        match = self.advantage_pattern.match(notation)
+        match = self.advantage_pattern.fullmatch(notation)
         if match:
             count, sides, keep = int(match.group(1)), int(match.group(2)), int(match.group(3))
             if sides < 1:
@@ -77,7 +77,7 @@ class DiceRoller:
             }
         
         # Check for disadvantage (keep lowest)
-        match = self.disadvantage_pattern.match(notation)
+        match = self.disadvantage_pattern.fullmatch(notation)
         if match:
             count, sides, keep = int(match.group(1)), int(match.group(2)), int(match.group(3))
             if sides < 1:
@@ -94,7 +94,7 @@ class DiceRoller:
             }
         
         # Standard roll
-        match = self.simple_pattern.match(notation)
+        match = self.simple_pattern.fullmatch(notation)
         if match:
             count, sides = int(match.group(1)), int(match.group(2))
             if sides < 1:

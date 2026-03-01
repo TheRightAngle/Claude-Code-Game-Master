@@ -138,30 +138,32 @@ class WorldSearcher:
                 continue
 
             # Search in description
-            if query_lower in data.get('description', '').lower():
+            description = data.get('description', '')
+            if isinstance(description, str) and query_lower in description.lower():
                 results[name] = data
                 continue
 
             # Search in NPCs list
             npcs = data.get('npcs', [])
-            if any(query_lower in npc.lower() for npc in npcs):
+            if isinstance(npcs, list) and any(isinstance(npc, str) and query_lower in npc.lower() for npc in npcs):
                 results[name] = data
                 continue
 
             # Search in locations list
             locations = data.get('locations', [])
-            if any(query_lower in loc.lower() for loc in locations):
+            if isinstance(locations, list) and any(isinstance(loc, str) and query_lower in loc.lower() for loc in locations):
                 results[name] = data
                 continue
 
             # Search in objectives
             objectives = data.get('objectives', [])
-            if any(query_lower in obj.lower() for obj in objectives):
+            if isinstance(objectives, list) and any(isinstance(obj, str) and query_lower in obj.lower() for obj in objectives):
                 results[name] = data
                 continue
 
             # Search in consequences
-            if query_lower in data.get('consequences', '').lower():
+            consequences = data.get('consequences', '')
+            if isinstance(consequences, str) and query_lower in consequences.lower():
                 results[name] = data
                 continue
 

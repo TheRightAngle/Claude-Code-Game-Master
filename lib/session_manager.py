@@ -6,6 +6,7 @@ Handles session lifecycle, party movement, and JSON-based saves
 
 import sys
 import shutil
+import re
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 from datetime import datetime, timezone
@@ -106,6 +107,13 @@ class SessionManager(EntityManager):
 
     # ==================== Party Movement ====================
 
+    @staticmethod
+    def _sanitize_save_name(name: str) -> str:
+        """Return a filesystem-safe save name component."""
+        text = str(name) if name is not None else ""
+        safe = re.sub(r"[^a-z0-9._-]+", "-", text.lower()).strip("-._")
+        return safe or "save"
+
     def _ensure_location_and_connection(self, old_location: str, new_location: str) -> None:
         """
         Auto-create destination location if missing and add bidirectional
@@ -115,7 +123,7 @@ class SessionManager(EntityManager):
         changed = False
 
         # Create destination if it doesn't exist
-        if new_location not in locations:
+        if not isinstance(locations.get(new_location), dict):
             locations[new_location] = {
                 "position": "unknown",
                 "connections": [],
@@ -125,17 +133,32 @@ class SessionManager(EntityManager):
             changed = True
 
         # Add bidirectional connection if old location is valid and known
-        if old_location and old_location != "Unknown" and old_location in locations:
+        if (
+            old_location
+            and old_location != "Unknown"
+            and old_location in locations
+            and isinstance(locations.get(old_location), dict)
+        ):
             # Check if connection from old -> new exists
             old_connections = locations[old_location].get("connections", [])
-            if not any(c.get("to") == new_location for c in old_connections):
+            if not isinstance(old_connections, list):
+                old_connections = []
+                locations[old_location]["connections"] = old_connections
+                changed = True
+
+            if not any(isinstance(c, dict) and c.get("to") == new_location for c in old_connections):
                 old_connections.append({"to": new_location, "path": "traveled"})
                 locations[old_location]["connections"] = old_connections
                 changed = True
 
             # Check if connection from new -> old exists
             new_connections = locations[new_location].get("connections", [])
-            if not any(c.get("to") == old_location for c in new_connections):
+            if not isinstance(new_connections, list):
+                new_connections = []
+                locations[new_location]["connections"] = new_connections
+                changed = True
+
+            if not any(isinstance(c, dict) and c.get("to") == old_location for c in new_connections):
                 new_connections.append({"to": old_location, "path": "traveled"})
                 locations[new_location]["connections"] = new_connections
                 changed = True
@@ -197,7 +220,7 @@ class SessionManager(EntityManager):
         Returns the save filename
         """
         # Normalize name
-        safe_name = name.lower().replace(' ', '-')
+        safe_name = self._sanitize_save_name(name)
         timestamp = self.get_iso_timestamp()
         filename = f"{timestamp}-{safe_name}.json"
 
@@ -249,25 +272,33 @@ class SessionManager(EntityManager):
             return False
 
         snapshot = save_data.get('snapshot', {})
+        if not isinstance(snapshot, dict):
+            print(f"[ERROR] Save file '{save_file.name}' is invalid")
+            return False
 
         # Restore each file
+        success = True
         if 'campaign_overview' in snapshot:
-            self.json_ops.save_json(self.campaign_file, snapshot['campaign_overview'])
+            success = self.json_ops.save_json(self.campaign_file, snapshot['campaign_overview']) and success
         if 'npcs' in snapshot:
-            self.json_ops.save_json("npcs.json", snapshot['npcs'])
+            success = self.json_ops.save_json("npcs.json", snapshot['npcs']) and success
         if 'locations' in snapshot:
-            self.json_ops.save_json("locations.json", snapshot['locations'])
+            success = self.json_ops.save_json("locations.json", snapshot['locations']) and success
         if 'facts' in snapshot:
-            self.json_ops.save_json("facts.json", snapshot['facts'])
+            success = self.json_ops.save_json("facts.json", snapshot['facts']) and success
         if 'consequences' in snapshot:
-            self.json_ops.save_json("consequences.json", snapshot['consequences'])
+            success = self.json_ops.save_json("consequences.json", snapshot['consequences']) and success
 
         # Restore characters
         if 'characters' in snapshot:
-            self._restore_characters(snapshot['characters'])
+            success = self._restore_characters(snapshot['characters']) and success
 
-        print(f"[SUCCESS] Restored from save: {save_file.name}")
-        return True
+        if success:
+            print(f"[SUCCESS] Restored from save: {save_file.name}")
+            return True
+
+        print(f"[ERROR] Failed to fully restore save: {save_file.name}")
+        return False
 
     def list_saves(self) -> List[Dict[str, Any]]:
         """
@@ -538,21 +569,31 @@ class SessionManager(EntityManager):
 
         return characters
 
-    def _restore_characters(self, characters: Dict[str, Any]) -> None:
+    def _restore_characters(self, characters: Dict[str, Any]) -> bool:
         """Restore character data from snapshot"""
         import json
+
+        if not isinstance(characters, dict):
+            return False
 
         # Check if this is new format (single 'character' key) or legacy
         if 'character' in characters and len(characters) == 1:
             # New format: restore to character.json
-            with open(self.character_file, 'w', encoding='utf-8') as f:
-                json.dump(characters['character'], f, indent=2)
+            try:
+                with open(self.character_file, 'w', encoding='utf-8') as f:
+                    json.dump(characters['character'], f, indent=2, ensure_ascii=False)
+                return True
+            except Exception as e:
+                print(f"[ERROR] Failed to restore character.json: {e}")
+                return False
         else:
             # Legacy format: restore to characters/ directory
             self.characters_dir.mkdir(parents=True, exist_ok=True)
+            success = True
             for name, data in characters.items():
                 char_file = self.characters_dir / f"{name}.json"
-                self.json_ops.save_json(str(char_file), data)
+                success = self.json_ops.save_json(str(char_file), data) and success
+            return success
 
     def _find_save(self, name: str) -> Optional[Path]:
         """Find a save file by name or partial match"""

@@ -165,10 +165,11 @@ class WorldStats:
 
         # Active consequences (first 3)
         consequences = self.json_ops.load_json("consequences.json")
-        if consequences.get("active"):
+        if isinstance(consequences, dict) and isinstance(consequences.get("active"), list) and consequences.get("active"):
             details["active_consequences"] = [
                 {"trigger": c.get("trigger"), "description": c.get("consequence", "")[:50]}
                 for c in consequences["active"][:3]
+                if isinstance(c, dict)
             ]
 
         # Active plots (first 5)

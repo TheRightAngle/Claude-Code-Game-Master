@@ -66,15 +66,25 @@ class ConsequenceManager(EntityManager):
         Resolve a consequence by ID
         """
         data = self.json_ops.load_json(self.consequences_file)
+        if not isinstance(data, dict):
+            data = {'active': [], 'resolved': []}
 
         resolved = None
         remaining = []
 
-        for c in data.get('active', []):
-            if c['id'] == consequence_id:
-                resolved = c
+        active = data.get('active', [])
+        if not isinstance(active, list):
+            active = []
+
+        for c in active:
+            if not isinstance(c, dict):
+                remaining.append(c)
+                continue
+
+            if c.get('id') == consequence_id:
+                resolved = dict(c)
                 resolved['resolved'] = self.json_ops.get_timestamp()
-                if 'resolved' not in data:
+                if not isinstance(data.get('resolved'), list):
                     data['resolved'] = []
                 data['resolved'].append(resolved)
             else:
@@ -83,7 +93,7 @@ class ConsequenceManager(EntityManager):
         if resolved:
             data['active'] = remaining
             if self.json_ops.save_json(self.consequences_file, data):
-                print(f"[SUCCESS] Resolved: {resolved['consequence']}")
+                print(f"[SUCCESS] Resolved: {resolved.get('consequence', 'Unknown consequence')}")
                 return True
         else:
             print(f"[ERROR] Consequence '{consequence_id}' not found")

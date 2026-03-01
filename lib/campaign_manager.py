@@ -239,15 +239,15 @@ class CampaignManager:
                 print("[ERROR] No active campaign set")
                 return None
 
-        campaign_path = self.campaigns_dir / name
-        if not campaign_path.is_dir():
+        campaign_path = self._resolve_campaign_path(name)
+        if campaign_path is None or not campaign_path.is_dir():
             print(f"[ERROR] Campaign '{name}' does not exist")
             return None
 
         info = {
-            "name": name,
+            "name": campaign_path.name,
             "path": str(campaign_path),
-            "is_active": self.get_active() == name
+            "is_active": self.get_active() == campaign_path.name
         }
 
         # Read campaign overview

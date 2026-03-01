@@ -129,3 +129,21 @@ class TestResolveConsequence:
         pending = mgr.check_pending()
         assert len(pending) == 1
         assert pending[0]["id"] == cid1
+
+    def test_resolve_ignores_malformed_active_entries(self, tmp_path):
+        ws, camp = make_world_state(
+            tmp_path,
+            consequences={
+                "active": [
+                    "bad-entry",
+                    {"consequence": "Missing id"},
+                    {"id": "abcd1234", "consequence": "Target", "trigger": "now"},
+                ],
+                "resolved": [],
+            },
+        )
+        mgr = ConsequenceManager(ws)
+
+        assert mgr.resolve("abcd1234") is True
+        resolved = mgr.list_resolved()
+        assert any(item.get("id") == "abcd1234" for item in resolved if isinstance(item, dict))
