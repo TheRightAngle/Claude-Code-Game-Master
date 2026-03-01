@@ -280,8 +280,9 @@ class SurvivalEngine:
                             if cs_min is not None:
                                 new_val = max(new_val, cs_min)
                             new_val = round(new_val, 2)
+                            # Persist canonical field for readers, keep legacy alias in sync.
+                            cs_entry['current'] = new_val
                             cs_entry['value'] = new_val
-                            cs_entry.pop('current', None)
                             self.json_ops.save_json("character.json", char_data)
                             changes.append({'stat': stat, 'old': old_val, 'new': new_val, 'change': diff})
 
@@ -443,8 +444,9 @@ class SurvivalEngine:
         if cs_min is not None:
             new_val = max(new_val, cs_min)
         new_val = round(new_val, 2)
+        # Persist canonical field for readers, keep legacy alias in sync.
+        cs['current'] = new_val
         cs['value'] = new_val
-        cs.pop('current', None)
         self.json_ops.save_json("character.json", char)
         return {'success': True, 'old_value': old_val, 'new_value': new_val}
 

@@ -108,62 +108,78 @@ case "$ACTION" in
                     echo "Usage: dm-navigation.sh path check <from> <to>"
                     exit 1
                 fi
-                $PYTHON_CMD -c "
-import json, sys
-sys.path.insert(0, '$MODULE_DIR/lib')
+                $PYTHON_CMD - "$MODULE_DIR/lib" "$CAMPAIGN_DIR/locations.json" "$1" "$2" <<'PYCODE'
+import json
+import sys
+
+lib_dir, locations_path, from_loc, to_loc = sys.argv[1:5]
+sys.path.insert(0, lib_dir)
 from path_intersect import check_path_intersection
-with open('$CAMPAIGN_DIR/locations.json') as f:
+
+with open(locations_path, encoding="utf-8") as f:
     locs = json.load(f)
-hits = check_path_intersection('$1', '$2', locs)
+
+hits = check_path_intersection(from_loc, to_loc, locs)
 if hits:
-    print('Path intersects:')
+    print("Path intersects:")
     for loc in hits:
-        print(f'  • {loc}')
+        print(f"  • {loc}")
     print()
-    print('Suggested: $1 → ' + ' → '.join(hits) + ' → $2')
+    print("Suggested: " + from_loc + " → " + " → ".join(hits) + " → " + to_loc)
 else:
-    print('✓ Direct path is clear')
-"
+    print("✓ Direct path is clear")
+PYCODE
                 ;;
             route)
                 if [ "$#" -lt 2 ]; then
                     echo "Usage: dm-navigation.sh path route <from> <to>"
                     exit 1
                 fi
-                $PYTHON_CMD -c "
-import json, sys
-sys.path.insert(0, '$MODULE_DIR/lib')
+                $PYTHON_CMD - "$MODULE_DIR/lib" "$CAMPAIGN_DIR/locations.json" "$1" "$2" <<'PYCODE'
+import json
+import sys
+
+lib_dir, locations_path, from_loc, to_loc = sys.argv[1:5]
+sys.path.insert(0, lib_dir)
 from path_intersect import find_route_with_waypoints
-with open('$CAMPAIGN_DIR/locations.json') as f:
+
+with open(locations_path, encoding="utf-8") as f:
     locs = json.load(f)
-route = find_route_with_waypoints('$1', '$2', locs)
-print('Route: ' + ' → '.join(route))
+
+route = find_route_with_waypoints(from_loc, to_loc, locs)
+print("Route: " + " → ".join(route))
 if len(route) > 2:
-    print('Via:')
+    print("Via:")
     for wp in route[1:-1]:
-        print(f'  • {wp}')
-"
+        print(f"  • {wp}")
+PYCODE
                 ;;
             analyze)
-                $PYTHON_CMD -c "
-import json, sys
-sys.path.insert(0, '$MODULE_DIR/lib')
+                $PYTHON_CMD - "$MODULE_DIR/lib" "$CAMPAIGN_DIR/locations.json" <<'PYCODE'
+import json
+import sys
+
+lib_dir, locations_path = sys.argv[1:3]
+sys.path.insert(0, lib_dir)
 from path_intersect import check_path_intersection
-with open('$CAMPAIGN_DIR/locations.json') as f:
+
+with open(locations_path, encoding="utf-8") as f:
     locs = json.load(f)
+
 found = False
 for loc_name, loc_data in locs.items():
-    for conn in loc_data.get('connections', []):
-        to_loc = conn.get('to')
+    for conn in loc_data.get("connections", []):
+        to_loc = conn.get("to")
         if not to_loc or to_loc not in locs:
             continue
         hits = check_path_intersection(loc_name, to_loc, locs)
         if hits:
             found = True
-            print(f'{loc_name} → {to_loc}: intersects {hits}')
+            print(f"{loc_name} → {to_loc}: intersects {hits}")
+
 if not found:
-    print('✓ No path intersections detected')
-"
+    print("✓ No path intersections detected")
+PYCODE
                 ;;
             *)
                 echo "Unknown path subcommand: $SUBCMD"

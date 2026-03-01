@@ -29,9 +29,14 @@ if [ "$#" -lt 1 ]; then
 fi
 
 require_active_campaign
+CAMPAIGN_DIR="${CAMPAIGN_DIR:-$WORLD_STATE_DIR}"
 
 ACTION="$1"
 shift
+
+is_number() {
+    [[ "$1" =~ ^-?[0-9]+([.][0-9]+)?$ ]]
+}
 
 case "$ACTION" in
     toggle)
@@ -92,8 +97,14 @@ case "$ACTION" in
             exit 1
         fi
         NEW_DC="$1"
+        if ! is_number "$NEW_DC"; then
+            echo "[ERROR] Invalid DC value: $NEW_DC"
+            exit 1
+        fi
         OVERVIEW="$CAMPAIGN_DIR/campaign-overview.json"
-        jq ".campaign_rules.encounter_system.base_dc = $NEW_DC" "$OVERVIEW" > "$OVERVIEW.tmp" && mv "$OVERVIEW.tmp" "$OVERVIEW"
+        jq --argjson new_dc "$NEW_DC" \
+           '.campaign_rules.encounter_system.base_dc = $new_dc' \
+           "$OVERVIEW" > "$OVERVIEW.tmp" && mv "$OVERVIEW.tmp" "$OVERVIEW"
         echo "[SUCCESS] Base DC set to $NEW_DC"
         ;;
 
@@ -103,8 +114,14 @@ case "$ACTION" in
             exit 1
         fi
         NEW_MOD="$1"
+        if ! is_number "$NEW_MOD"; then
+            echo "[ERROR] Invalid distance modifier: $NEW_MOD"
+            exit 1
+        fi
         OVERVIEW="$CAMPAIGN_DIR/campaign-overview.json"
-        jq ".campaign_rules.encounter_system.distance_modifier = $NEW_MOD" "$OVERVIEW" > "$OVERVIEW.tmp" && mv "$OVERVIEW.tmp" "$OVERVIEW"
+        jq --argjson new_mod "$NEW_MOD" \
+           '.campaign_rules.encounter_system.distance_modifier = $new_mod' \
+           "$OVERVIEW" > "$OVERVIEW.tmp" && mv "$OVERVIEW.tmp" "$OVERVIEW"
         echo "[SUCCESS] Distance modifier set to $NEW_MOD"
         ;;
 
@@ -116,7 +133,9 @@ case "$ACTION" in
         fi
         STAT_NAME="$1"
         OVERVIEW="$CAMPAIGN_DIR/campaign-overview.json"
-        jq ".campaign_rules.encounter_system.stat_to_use = \"$STAT_NAME\"" "$OVERVIEW" > "$OVERVIEW.tmp" && mv "$OVERVIEW.tmp" "$OVERVIEW"
+        jq --arg stat_name "$STAT_NAME" \
+           '.campaign_rules.encounter_system.stat_to_use = $stat_name' \
+           "$OVERVIEW" > "$OVERVIEW.tmp" && mv "$OVERVIEW.tmp" "$OVERVIEW"
         echo "[SUCCESS] Encounter stat set to $STAT_NAME"
         ;;
 
@@ -127,8 +146,14 @@ case "$ACTION" in
         fi
         TIME="$1"
         MOD="$2"
+        if ! is_number "$MOD"; then
+            echo "[ERROR] Invalid time modifier: $MOD"
+            exit 1
+        fi
         OVERVIEW="$CAMPAIGN_DIR/campaign-overview.json"
-        jq ".campaign_rules.encounter_system.time_dc_modifiers.\"$TIME\" = $MOD" "$OVERVIEW" > "$OVERVIEW.tmp" && mv "$OVERVIEW.tmp" "$OVERVIEW"
+        jq --arg time_name "$TIME" --argjson mod "$MOD" \
+           '.campaign_rules.encounter_system.time_dc_modifiers[$time_name] = $mod' \
+           "$OVERVIEW" > "$OVERVIEW.tmp" && mv "$OVERVIEW.tmp" "$OVERVIEW"
         echo "[SUCCESS] Time modifier for '$TIME' set to $MOD"
         ;;
 

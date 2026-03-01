@@ -343,7 +343,7 @@ class NavigationManager:
             speed_kmh = character_data.get("speed_kmh", 4.0)
             elapsed_hours = (distance_meters / 1000.0) / (speed_kmh * speed_multiplier)
 
-        survival_stats_script = PROJECT_ROOT / ".claude" / "modules" / "survival-stats" / "tools" / "dm-survival.sh"
+        survival_stats_script = PROJECT_ROOT / ".claude" / "modules" / "custom-stats" / "tools" / "dm-survival.sh"
 
         if elapsed_hours > 0:
             if survival_stats_script.exists():
@@ -357,9 +357,9 @@ class NavigationManager:
                     if result.returncode == 0:
                         print(result.stdout.strip())
                     else:
-                        print(f"[WARNING] survival-stats time advance failed: {result.stderr.strip()}")
+                        print(f"[WARNING] custom-stats time advance failed: {result.stderr.strip()}")
                 except Exception as e:
-                    print(f"[WARNING] Could not call survival-stats module: {e}")
+                    print(f"[WARNING] Could not call custom-stats module: {e}")
             else:
                 print(f"[INFO] Travel time: {elapsed_hours:.2f} hours ({distance_meters}m)")
 

@@ -40,6 +40,12 @@ def merge_connections(conn_a: dict, conn_b: dict) -> dict:
     return best
 
 
+def get_campaigns_dir() -> Path:
+    """Return the canonical campaigns directory under project root."""
+    project_root = Path(__file__).resolve().parents[4]
+    return project_root / 'world-state' / 'campaigns'
+
+
 def migrate_campaign(locations_file: Path, apply: bool = False) -> dict:
     with open(locations_file, 'r', encoding='utf-8') as f:
         locations = json.load(f)
@@ -150,7 +156,7 @@ def main():
     parser.add_argument('--campaign', help='Specific campaign name (default: all)')
     args = parser.parse_args()
 
-    campaigns_dir = Path(__file__).parent.parent / 'world-state' / 'campaigns'
+    campaigns_dir = get_campaigns_dir()
     if not campaigns_dir.exists():
         print("[ERROR] No campaigns directory found")
         sys.exit(1)
