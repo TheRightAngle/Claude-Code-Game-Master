@@ -1,7 +1,71 @@
 import pytest
 import json
+import shutil
+import subprocess
 from pathlib import Path
 from lib.note_manager import NoteManager
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _prepare_isolated_note_cli(tmp_path: Path) -> tuple[Path, Path]:
+    project_root = tmp_path / "project"
+    tools_dir = project_root / "tools"
+    campaign_dir = project_root / "world-state" / "campaigns" / "test-campaign"
+
+    tools_dir.mkdir(parents=True, exist_ok=True)
+    campaign_dir.mkdir(parents=True, exist_ok=True)
+
+    shutil.copy2(REPO_ROOT / "tools" / "dm-note.sh", tools_dir / "dm-note.sh")
+    shutil.copy2(REPO_ROOT / "tools" / "common.sh", tools_dir / "common.sh")
+    shutil.copytree(REPO_ROOT / "lib", project_root / "lib")
+
+    (project_root / "world-state" / "active-campaign.txt").write_text("test-campaign")
+    (campaign_dir / "campaign-overview.json").write_text(
+        json.dumps(
+            {
+                "campaign_name": "Test Campaign",
+                "time_of_day": "Day",
+                "current_date": "Day 1",
+            },
+            ensure_ascii=False,
+        )
+    )
+    (campaign_dir / "facts.json").write_text(
+        json.dumps(
+            {
+                "session_events": [
+                    {
+                        "fact": "Party arrived",
+                        "timestamp": "2024-01-01T00:00:00Z",
+                    }
+                ]
+            },
+            ensure_ascii=False,
+        )
+    )
+
+    return project_root, tools_dir / "dm-note.sh"
+
+
+def test_dm_note_categories_works_from_non_repo_cwd(tmp_path: Path) -> None:
+    project_root, note_script = _prepare_isolated_note_cli(tmp_path)
+    outside_cwd = tmp_path / "outside"
+    outside_cwd.mkdir()
+
+    result = subprocess.run(
+        ["bash", str(note_script), "categories"],
+        cwd=outside_cwd,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+
+    assert result.returncode == 0
+    assert "Fact Categories:" in result.stdout
+    assert "- session_events" in result.stdout
 
 
 def make_world_state(tmp_path, facts=None):

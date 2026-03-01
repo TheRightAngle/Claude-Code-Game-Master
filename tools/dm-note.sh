@@ -18,10 +18,16 @@ require_active_campaign
 
 if [ "$1" = "categories" ]; then
     echo "Fact Categories:"
-    $PYTHON_CMD -m lib.note_manager categories
+    (
+        cd "$PROJECT_ROOT" || exit 1
+        $PYTHON_CMD -m lib.note_manager categories
+    )
     exit $?
 elif [ "$#" -eq 2 ]; then
-    $PYTHON_CMD -m lib.note_manager add "$1" "$2"
+    (
+        cd "$PROJECT_ROOT" || exit 1
+        $PYTHON_CMD -m lib.note_manager add "$1" "$2"
+    )
     exit $?
 else
     echo "Usage: dm-note.sh <category> <fact>"

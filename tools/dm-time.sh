@@ -3,7 +3,7 @@
 
 source "$(dirname "$0")/common.sh"
 
-if [ -z "$1" ] || [ -z "$2" ]; then
+if [ "$#" -lt 2 ]; then
     echo "Usage: dm-time.sh <time_of_day> <date>"
     echo "Example: dm-time.sh \"Dawn\" \"16th day of Harvestmoon, Year 1247\""
     exit 1
@@ -11,5 +11,12 @@ fi
 
 require_active_campaign
 
-$PYTHON_CMD -m lib.time_manager update "$1" "$2"
+TIME_OF_DAY="$1"
+shift
+DATE="$*"
+
+(
+    cd "$PROJECT_ROOT" || exit 1
+    $PYTHON_CMD -m lib.time_manager update "$TIME_OF_DAY" "$DATE"
+)
 exit $?

@@ -50,6 +50,18 @@ invalid_n_value() {
     exit 1
 }
 
+conflicting_tag_filters() {
+    error "--tag-location and --tag-quest cannot be used together"
+    exit 1
+}
+
+run_python_from_project() {
+    (
+        cd "$PROJECT_ROOT" || exit 1
+        $PYTHON_CMD "$@"
+    )
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --rag)
@@ -78,6 +90,9 @@ while [[ $# -gt 0 ]]; do
             if [ $# -lt 2 ] || [[ "$2" == -* ]]; then
                 missing_option_value "--tag-location"
             fi
+            if [ "$TAG_SEARCH" = true ] && [ "$TAG_TYPE" != "--tag-location" ]; then
+                conflicting_tag_filters
+            fi
             TAG_SEARCH=true
             TAG_TYPE="--tag-location"
             TAG_VALUE="$2"
@@ -86,6 +101,9 @@ while [[ $# -gt 0 ]]; do
         --tag-quest)
             if [ $# -lt 2 ] || [[ "$2" == -* ]]; then
                 missing_option_value "--tag-quest"
+            fi
+            if [ "$TAG_SEARCH" = true ] && [ "$TAG_TYPE" != "--tag-quest" ]; then
+                conflicting_tag_filters
             fi
             TAG_SEARCH=true
             TAG_TYPE="--tag-quest"
@@ -102,6 +120,8 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             elif [ -z "$QUERY" ]; then
                 QUERY="$1"
+            else
+                QUERY="$QUERY $1"
             fi
             shift
             ;;
@@ -130,7 +150,7 @@ fi
 if [ "$TAG_SEARCH" = true ]; then
     echo "Searching World State"
     echo "====================="
-    WORLD_OUTPUT=$($PYTHON_CMD "$LIB_DIR/search.py" "$TAG_TYPE" "$TAG_VALUE" $([ "$FULL_OUTPUT" = true ] && echo "--full"))
+    WORLD_OUTPUT=$(run_python_from_project "$LIB_DIR/search.py" "$TAG_TYPE" "$TAG_VALUE" $([ "$FULL_OUTPUT" = true ] && echo "--full"))
     WORLD_STATUS=$?
     echo "$WORLD_OUTPUT"
     WORLD_CHARS=${#WORLD_OUTPUT}
@@ -146,7 +166,7 @@ CAMPAIGN_DIR=$(bash "$TOOLS_DIR/dm-campaign.sh" path 2>/dev/null)
 if [ "$RAG_ONLY" = false ]; then
     echo "Searching World State"
     echo "====================="
-    WORLD_OUTPUT=$($PYTHON_CMD "$LIB_DIR/search.py" "$QUERY" $([ "$FULL_OUTPUT" = true ] && echo "--full"))
+    WORLD_OUTPUT=$(run_python_from_project "$LIB_DIR/search.py" "$QUERY" $([ "$FULL_OUTPUT" = true ] && echo "--full"))
     WORLD_STATUS=$?
     echo "$WORLD_OUTPUT"
     WORLD_CHARS=${#WORLD_OUTPUT}
@@ -165,7 +185,7 @@ if [ "$WORLD_ONLY" = false ]; then
         echo ""
         echo "Source Material Matches"
         echo "======================="
-        RAG_OUTPUT=$($PYTHON_CMD "$LIB_DIR/entity_enhancer.py" search "$QUERY" -n "$RAG_COUNT" $([ "$FULL_OUTPUT" = true ] && echo "--full"))
+        RAG_OUTPUT=$(run_python_from_project "$LIB_DIR/entity_enhancer.py" search "$QUERY" -n "$RAG_COUNT" $([ "$FULL_OUTPUT" = true ] && echo "--full"))
         RAG_STATUS=$?
         echo "$RAG_OUTPUT"
         RAG_CHARS=${#RAG_OUTPUT}
