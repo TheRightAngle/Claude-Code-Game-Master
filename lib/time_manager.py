@@ -26,6 +26,12 @@ class TimeManager:
 
         data['time_of_day'] = time_of_day
         data['current_date'] = date
+        time_data = data.get('time', {})
+        if not isinstance(time_data, dict):
+            time_data = {}
+        time_data['time_of_day'] = time_of_day
+        time_data['current_date'] = date
+        data['time'] = time_data
 
         if not self.json_ops.save_json("campaign-overview.json", data):
             print(f"[ERROR] Failed to update time")
@@ -39,9 +45,12 @@ class TimeManager:
     def get_time(self) -> dict:
         """Get current campaign time."""
         data = self.json_ops.load_json("campaign-overview.json")
+        time_data = data.get('time', {})
+        if not isinstance(time_data, dict):
+            time_data = {}
         return {
-            'time_of_day': data.get('time_of_day', 'Unknown'),
-            'current_date': data.get('current_date', 'Unknown')
+            'time_of_day': time_data.get('time_of_day', data.get('time_of_day', 'Unknown')),
+            'current_date': time_data.get('current_date', data.get('current_date', 'Unknown'))
         }
 
 

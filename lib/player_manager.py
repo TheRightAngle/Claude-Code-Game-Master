@@ -73,6 +73,25 @@ class PlayerManager(EntityManager):
         char_id = self._name_to_id(name)
         return self.characters_dir / f"{char_id}.json"
 
+    def _matches_single_character(self, requested_name: Optional[str], char: Dict[str, Any]) -> bool:
+        """Check whether requested name matches active/single character context."""
+        if not requested_name:
+            return True
+
+        requested_id = self._name_to_id(requested_name)
+
+        # Prefer the actual character file name when present; overview can be stale.
+        character_name = char.get('name')
+        if isinstance(character_name, str) and character_name.strip():
+            return requested_id == self._name_to_id(character_name)
+
+        campaign = self.json_ops.load_json(self.campaign_file) or {}
+        active_name = campaign.get('current_character')
+        if not isinstance(active_name, str) or not active_name.strip():
+            return False
+
+        return requested_id == self._name_to_id(active_name)
+
     def _load_character(self, name: Optional[str] = None) -> Optional[Dict]:
         """
         Load character data from file
@@ -82,7 +101,10 @@ class PlayerManager(EntityManager):
         if self._is_using_single_character():
             try:
                 with open(self.character_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    char = json.load(f)
+                if self._matches_single_character(name, char):
+                    return char
+                return None
             except (json.JSONDecodeError, IOError) as e:
                 print(f"[ERROR] Failed to load character: {e}")
                 return None

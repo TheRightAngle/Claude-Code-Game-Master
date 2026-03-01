@@ -114,6 +114,38 @@ class TestModifyHp:
         assert isinstance(char["hp"], dict)
         assert set(char["hp"].keys()) == {"current", "max"}
 
+    def test_modify_hp_rejects_non_active_name_in_single_character_mode(self, tmp_path):
+        ws, camp = make_campaign(tmp_path)
+        mgr = PlayerManager(ws)
+
+        result = mgr.modify_hp("Someone Else", -5)
+
+        assert result["success"] is False
+        char = json.loads((camp / "character.json").read_text())
+        assert char["hp"]["current"] == 20
+
+    def test_modify_hp_allows_actual_character_name_when_current_character_is_stale(self, tmp_path):
+        ws, camp = make_campaign(
+            tmp_path,
+            overview_extra={"current_character": "Old Hero"},
+            character={
+                "name": "Hero",
+                "level": 1,
+                "hp": {"current": 20, "max": 20},
+                "gold": 100,
+                "xp": 0,
+                "equipment": [],
+            },
+        )
+        mgr = PlayerManager(ws)
+
+        result = mgr.modify_hp("Hero", -5)
+
+        assert result["success"] is True
+        assert result["current_hp"] == 15
+        char = json.loads((camp / "character.json").read_text())
+        assert char["hp"]["current"] == 15
+
 
 class TestModifyGold:
     def test_add_gold(self, tmp_path):

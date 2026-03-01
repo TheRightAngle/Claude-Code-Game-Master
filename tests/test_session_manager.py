@@ -37,6 +37,8 @@ def make_world_state(tmp_path, overview_extra=None, with_character=True):
     (camp / "npcs.json").write_text("{}")
     (camp / "facts.json").write_text("{}")
     (camp / "consequences.json").write_text("{}")
+    (camp / "plots.json").write_text("{}")
+    (camp / "items.json").write_text("{}")
 
     return str(ws), camp
 
@@ -205,6 +207,8 @@ class TestSavePathTraversal:
     def test_restore_save_returns_false_when_snapshot_write_fails(self, tmp_path, monkeypatch):
         ws, camp = make_world_state(tmp_path)
         mgr = SessionManager(ws)
+        original_overview = json.loads((camp / "campaign-overview.json").read_text())
+        original_locations = json.loads((camp / "locations.json").read_text())
 
         save_file = camp / "saves" / "bad-write.json"
         save_file.parent.mkdir(parents=True, exist_ok=True)
@@ -230,6 +234,57 @@ class TestSavePathTraversal:
         monkeypatch.setattr(mgr.json_ops, "save_json", fail_locations)
 
         assert mgr.restore_save("bad-write") is False
+        assert json.loads((camp / "campaign-overview.json").read_text()) == original_overview
+        assert json.loads((camp / "locations.json").read_text()) == original_locations
+
+    def test_create_and_restore_save_round_trips_plots_and_items(self, tmp_path):
+        ws, camp = make_world_state(tmp_path)
+        mgr = SessionManager(ws)
+
+        original_plots = {"main_arc": {"status": "active", "chapter": 2}}
+        original_items = {"healing_potion": {"quantity": 3, "rarity": "common"}}
+        (camp / "plots.json").write_text(json.dumps(original_plots, ensure_ascii=False))
+        (camp / "items.json").write_text(json.dumps(original_items, ensure_ascii=False))
+
+        filename = mgr.create_save("with-plots-items")
+
+        (camp / "plots.json").write_text(json.dumps({"main_arc": {"status": "completed"}}, ensure_ascii=False))
+        (camp / "items.json").write_text(json.dumps({"healing_potion": {"quantity": 0}}, ensure_ascii=False))
+
+        assert mgr.restore_save(filename) is True
+        assert json.loads((camp / "plots.json").read_text()) == original_plots
+        assert json.loads((camp / "items.json").read_text()) == original_items
+
+    def test_restore_save_rolls_back_if_backup_capture_fails_after_prior_write(self, tmp_path, monkeypatch):
+        ws, camp = make_world_state(tmp_path)
+        mgr = SessionManager(ws)
+        original_overview = json.loads((camp / "campaign-overview.json").read_text())
+
+        save_file = camp / "saves" / "backup-capture-fail.json"
+        save_file.parent.mkdir(parents=True, exist_ok=True)
+        save_file.write_text(
+            json.dumps(
+                {
+                    "snapshot": {
+                        "campaign_overview": {"campaign_name": "Should Roll Back"},
+                        "npcs": {"Guard": {"is_party_member": False}},
+                    }
+                },
+                ensure_ascii=False,
+            )
+        )
+
+        real_capture = mgr._capture_file_state
+
+        def fail_on_npcs(filepath):
+            if filepath.name == "npcs.json":
+                return None
+            return real_capture(filepath)
+
+        monkeypatch.setattr(mgr, "_capture_file_state", fail_on_npcs)
+
+        assert mgr.restore_save("backup-capture-fail") is False
+        assert json.loads((camp / "campaign-overview.json").read_text()) == original_overview
 
 
 class TestSessionStartEnd:
@@ -255,6 +310,47 @@ class TestSessionStartEnd:
         mgr.end_session("Fought dragons and won")
         log = (camp / "session-log.md").read_text()
         assert "Fought dragons and won" in log
+
+    def test_end_session_increments_session_count_in_campaign_overview(self, tmp_path):
+        ws, camp = make_world_state(tmp_path)
+        mgr = SessionManager(ws)
+
+        mgr.start_session()
+        mgr.end_session("Summary one")
+
+        overview = json.loads((camp / "campaign-overview.json").read_text())
+        assert overview["session_count"] == 1
+
+    def test_end_session_rollback_when_counter_persist_fails(self, tmp_path, monkeypatch):
+        ws, camp = make_world_state(tmp_path)
+        mgr = SessionManager(ws)
+        mgr.start_session()
+
+        original_log = (camp / "session-log.md").read_text()
+        original_overview = json.loads((camp / "campaign-overview.json").read_text())
+        real_save_json = mgr.json_ops.save_json
+
+        def fail_campaign_overview(filename, data, indent=2):
+            if filename == "campaign-overview.json":
+                return False
+            return real_save_json(filename, data, indent=indent)
+
+        monkeypatch.setattr(mgr.json_ops, "save_json", fail_campaign_overview)
+
+        assert mgr.end_session("This should rollback") is False
+        assert (camp / "session-log.md").read_text() == original_log
+        assert json.loads((camp / "campaign-overview.json").read_text()) == original_overview
+
+    def test_end_session_syncs_campaign_counter_to_log_session_number(self, tmp_path):
+        ws, camp = make_world_state(tmp_path, overview_extra={"session_count": 99})
+        mgr = SessionManager(ws)
+
+        mgr.start_session()
+        assert mgr.end_session("Summary one") is True
+
+        overview = json.loads((camp / "campaign-overview.json").read_text())
+        assert overview["session_count"] == mgr._get_session_number()
+        assert overview["session_count"] == 1
 
     def test_session_count_increments(self, tmp_path):
         ws, camp = make_world_state(tmp_path)

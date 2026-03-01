@@ -220,7 +220,7 @@ review_content() {
 
 clean_temp() {
     local campaign_name="$1"
-    local campaign_real campaigns_real extract_real world_real
+    local campaign_real campaigns_real extract_real world_real cleanup_target
 
     if [ -n "$campaign_name" ]; then
         echo "Cleaning campaign extraction directory: $campaign_name"
@@ -236,8 +236,20 @@ clean_temp() {
                     exit 1
                     ;;
                 "$campaigns_real"/*)
-                    rm -rf -- "$campaign_real"
-                    echo "Cleaned: $campaign_real"
+                    # Only clear extraction artifacts; never delete campaign root.
+                    for artifact in \
+                        "chunks" \
+                        "extracted" \
+                        "merged-results.json" \
+                        "current-document.txt" \
+                        "metadata.json"
+                    do
+                        cleanup_target="$campaign_real/$artifact"
+                        if [ -e "$cleanup_target" ]; then
+                            rm -rf -- "$cleanup_target"
+                            echo "Removed: $cleanup_target"
+                        fi
+                    done
                     ;;
                 *)
                     echo "Error: Refusing cleanup outside campaigns directory: $campaign_real"

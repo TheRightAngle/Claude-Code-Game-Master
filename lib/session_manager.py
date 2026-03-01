@@ -82,11 +82,31 @@ class SessionManager(EntityManager):
         # Get session number
         session_num = self._get_session_number()
 
+        campaign_before = self.json_ops.load_json(self.campaign_file) or {}
+        campaign_after = dict(campaign_before)
+        campaign_after["session_count"] = session_num
+
+        # Capture log state so we can restore it if log append fails.
+        log_backup = self._capture_file_state(self.session_log)
+        if log_backup is None:
+            print("[ERROR] Failed to capture session log state before ending session")
+            return False
+
+        if not self.json_ops.save_json(self.campaign_file, campaign_after):
+            print("[ERROR] Failed to persist session_count in campaign overview")
+            return False
+
         # Log session end
-        with open(self.session_log, 'a') as f:
-            f.write(f"### Session Ended: {timestamp}\n")
-            f.write(f"{summary}\n\n")
-            f.write("---\n\n")
+        try:
+            with open(self.session_log, 'a') as f:
+                f.write(f"### Session Ended: {timestamp}\n")
+                f.write(f"{summary}\n\n")
+                f.write("---\n\n")
+        except Exception as e:
+            self.json_ops.save_json(self.campaign_file, campaign_before)
+            self._restore_file_state(self.session_log, log_backup)
+            print(f"[ERROR] Failed to write session end log: {e}")
+            return False
 
         print(f"[SUCCESS] Session {session_num} ended and logged")
         return True
@@ -231,6 +251,8 @@ class SessionManager(EntityManager):
             "locations": self.json_ops.load_json("locations.json"),
             "facts": self.json_ops.load_json("facts.json"),
             "consequences": self.json_ops.load_json("consequences.json"),
+            "plots": self.json_ops.load_json("plots.json"),
+            "items": self.json_ops.load_json("items.json"),
             "characters": self._load_all_characters()
         }
 
@@ -276,29 +298,50 @@ class SessionManager(EntityManager):
             print(f"[ERROR] Save file '{save_file.name}' is invalid")
             return False
 
-        # Restore each file
-        success = True
-        if 'campaign_overview' in snapshot:
-            success = self.json_ops.save_json(self.campaign_file, snapshot['campaign_overview']) and success
-        if 'npcs' in snapshot:
-            success = self.json_ops.save_json("npcs.json", snapshot['npcs']) and success
-        if 'locations' in snapshot:
-            success = self.json_ops.save_json("locations.json", snapshot['locations']) and success
-        if 'facts' in snapshot:
-            success = self.json_ops.save_json("facts.json", snapshot['facts']) and success
-        if 'consequences' in snapshot:
-            success = self.json_ops.save_json("consequences.json", snapshot['consequences']) and success
+        restore_targets = [
+            ('campaign_overview', self.campaign_file),
+            ('npcs', "npcs.json"),
+            ('locations', "locations.json"),
+            ('facts', "facts.json"),
+            ('consequences', "consequences.json"),
+            ('plots', "plots.json"),
+            ('items', "items.json"),
+        ]
 
-        # Restore characters
+        file_backups: Dict[Path, Dict[str, Any]] = {}
+        written_files: List[Path] = []
+
+        for snapshot_key, filename in restore_targets:
+            if snapshot_key not in snapshot:
+                continue
+
+            target_path = self.campaign_dir / filename
+            if target_path not in file_backups:
+                backup = self._capture_file_state(target_path)
+                if backup is None:
+                    self._rollback_files(file_backups, written_files)
+                    print(f"[ERROR] Failed to prepare restore backup for {target_path.name}")
+                    return False
+                file_backups[target_path] = backup
+
+            if not self.json_ops.save_json(filename, snapshot[snapshot_key]):
+                self._rollback_files(file_backups, written_files)
+                print(f"[ERROR] Failed to fully restore save: {save_file.name}")
+                return False
+            written_files.append(target_path)
+
+        # Restore characters with rollback if character writes fail.
         if 'characters' in snapshot:
-            success = self._restore_characters(snapshot['characters']) and success
+            character_backup = self._capture_character_state()
+            if character_backup is None or not self._restore_characters(snapshot['characters']):
+                if character_backup is not None:
+                    self._restore_character_state(character_backup)
+                self._rollback_files(file_backups, written_files)
+                print(f"[ERROR] Failed to fully restore save: {save_file.name}")
+                return False
 
-        if success:
-            print(f"[SUCCESS] Restored from save: {save_file.name}")
-            return True
-
-        print(f"[ERROR] Failed to fully restore save: {save_file.name}")
-        return False
+        print(f"[SUCCESS] Restored from save: {save_file.name}")
+        return True
 
     def list_saves(self) -> List[Dict[str, Any]]:
         """
@@ -550,6 +593,88 @@ class SessionManager(EntityManager):
         """Get recent session entries"""
         history = self.get_history()
         return history[-count:] if history else []
+
+    def _capture_file_state(self, filepath: Path) -> Optional[Dict[str, Any]]:
+        """Capture a file's current bytes and existence for rollback."""
+        try:
+            if filepath.exists():
+                return {"exists": True, "content": filepath.read_bytes()}
+            return {"exists": False, "content": None}
+        except Exception as e:
+            print(f"[ERROR] Failed to capture file state for {filepath.name}: {e}")
+            return None
+
+    def _restore_file_state(self, filepath: Path, state: Dict[str, Any]) -> bool:
+        """Restore a file to a previously captured state."""
+        try:
+            if state.get("exists"):
+                filepath.parent.mkdir(parents=True, exist_ok=True)
+                filepath.write_bytes(state.get("content") or b"")
+            elif filepath.exists():
+                filepath.unlink()
+            return True
+        except Exception as e:
+            print(f"[ERROR] Failed to restore file state for {filepath.name}: {e}")
+            return False
+
+    def _rollback_files(self, backups: Dict[Path, Dict[str, Any]], written_files: List[Path]) -> bool:
+        """Rollback previously written files in reverse write order."""
+        ok = True
+        for filepath in reversed(written_files):
+            state = backups.get(filepath)
+            if state is None:
+                continue
+            ok = self._restore_file_state(filepath, state) and ok
+        return ok
+
+    def _capture_character_state(self) -> Optional[Dict[str, Any]]:
+        """Capture character file state for rollback."""
+        state: Dict[str, Any] = {
+            "character_file": self._capture_file_state(self.character_file),
+            "legacy_dir_exists": self.characters_dir.exists(),
+            "legacy_files": {},
+        }
+        if state["character_file"] is None:
+            return None
+
+        if self.characters_dir.exists():
+            for char_file in self.characters_dir.glob("*.json"):
+                file_state = self._capture_file_state(char_file)
+                if file_state is None:
+                    return None
+                state["legacy_files"][char_file.name] = file_state
+
+        return state
+
+    def _restore_character_state(self, state: Dict[str, Any]) -> bool:
+        """Restore character files to captured rollback state."""
+        ok = True
+        char_file_state = state.get("character_file")
+        if isinstance(char_file_state, dict):
+            ok = self._restore_file_state(self.character_file, char_file_state) and ok
+
+        legacy_files = state.get("legacy_files", {})
+        legacy_dir_exists = state.get("legacy_dir_exists", False)
+
+        if self.characters_dir.exists():
+            for char_file in self.characters_dir.glob("*.json"):
+                if char_file.name not in legacy_files:
+                    try:
+                        char_file.unlink()
+                    except Exception:
+                        ok = False
+
+        if legacy_dir_exists:
+            self.characters_dir.mkdir(parents=True, exist_ok=True)
+            for name, file_state in legacy_files.items():
+                ok = self._restore_file_state(self.characters_dir / name, file_state) and ok
+        elif self.characters_dir.exists():
+            try:
+                self.characters_dir.rmdir()
+            except OSError:
+                pass
+
+        return ok
 
     def _load_all_characters(self) -> Dict[str, Any]:
         """Load character data for snapshot"""

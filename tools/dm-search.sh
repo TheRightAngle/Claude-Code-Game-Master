@@ -86,6 +86,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Validate incompatible modes before campaign checks.
+if [ "$WORLD_ONLY" = true ] && [ "$RAG_ONLY" = true ]; then
+    error "--world-only and --rag-only cannot be used together"
+    exit 1
+fi
+
 require_active_campaign
 
 # Validate input
