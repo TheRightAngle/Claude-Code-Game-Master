@@ -5,7 +5,6 @@ Provides safe JSON read/write/update operations with proper error handling
 """
 
 import json
-import os
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime, timezone
@@ -23,7 +22,13 @@ class JsonOperations:
         Load JSON file with error handling
         Returns default value if file doesn't exist or is invalid
         """
-        filepath = self._resolve_path(filename)
+        try:
+            filepath = self._resolve_path(filename)
+        except ValueError as e:
+            print(f"[ERROR] Invalid path '{filename}': {e}")
+            if default is None:
+                default = {}
+            return default
 
         if not filepath.exists():
             if default is None:
@@ -45,7 +50,11 @@ class JsonOperations:
         Save data to JSON file with atomic write
         Returns True on success, False on failure
         """
-        filepath = self._resolve_path(filename)
+        try:
+            filepath = self._resolve_path(filename)
+        except ValueError as e:
+            print(f"[ERROR] Invalid path '{filename}': {e}")
+            return False
 
         try:
             # Write to temp file first for atomic operation
@@ -197,9 +206,22 @@ class JsonOperations:
 
     def _resolve_path(self, filename: str) -> Path:
         """Resolve file path relative to world state directory"""
-        if os.path.isabs(filename):
-            return Path(filename)
-        return self.world_state_dir / filename
+        if not isinstance(filename, str) or not filename.strip():
+            raise ValueError("filename must be a non-empty string")
+
+        candidate = Path(filename)
+        if not candidate.is_absolute():
+            candidate = self.world_state_dir / candidate
+
+        resolved = candidate.resolve(strict=False)
+        root = self.world_state_dir.resolve(strict=False)
+
+        try:
+            resolved.relative_to(root)
+        except ValueError as exc:
+            raise ValueError("path escapes world state directory") from exc
+
+        return resolved
 
     @staticmethod
     def get_timestamp() -> str:
