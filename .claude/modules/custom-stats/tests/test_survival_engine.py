@@ -469,6 +469,48 @@ class TestEdgeCases:
         assert result['stat_changes'] == []
 
 
+class TestFormulaSafety:
+    def test_malicious_formula_does_not_execute(self, tmp_path):
+        marker = tmp_path / "formula-pwned.txt"
+        payload = (
+            "[c for c in (1).__class__.__base__.__subclasses__() "
+            f"if c.__name__=='_wrap_close'][0].__init__.__globals__['system']('touch {marker}')"
+        )
+
+        campaign = base_campaign(
+            {
+                "rules": [
+                    {"stat": "hunger", "per_hour": -2, "per_hour_formula": payload},
+                ]
+            }
+        )
+        ws = make_campaign(tmp_path, campaign, base_character())
+        engine = make_engine(ws)
+
+        result = engine.tick(1)
+
+        assert marker.exists() is False
+        hunger_change = next((c for c in result["stat_changes"] if c["stat"] == "hunger"), None)
+        assert hunger_change is not None
+        assert hunger_change["change"] == -2
+
+
+class TestElapsedHours:
+    def test_elapsed_hours_handles_month_rollover(self):
+        sys.path.insert(0, str(PROJECT_ROOT / ".claude" / "modules" / "custom-stats" / "lib"))
+        from survival_engine import SurvivalEngine
+
+        elapsed = SurvivalEngine._calculate_elapsed_hours(
+            None,
+            prev_time="23:00",
+            new_time="01:00",
+            prev_date="31st of March, 2012",
+            new_date="1st of April, 2012",
+        )
+
+        assert elapsed == 2.0
+
+
 # ─── Tests: Status Display ─────────────────────────────────
 
 class TestStatus:

@@ -7,9 +7,12 @@ DM (Claude) calls this via dm-survival.sh after time advances.
 """
 
 import argparse
+import ast
 import copy
 import json
+import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
@@ -39,6 +42,93 @@ class SurvivalEngine:
             if isinstance(stat_data, dict) and 'current' not in stat_data and 'value' in stat_data:
                 stat_data['current'] = stat_data['value']
         return char
+
+    @staticmethod
+    def _safe_eval_formula(formula: str, variables: dict) -> float:
+        """Evaluate arithmetic formulas with a strict AST allow-list."""
+
+        allowed_functions = {
+            "abs": abs,
+            "max": max,
+            "min": min,
+            "round": round,
+        }
+        allowed_bin_ops = {
+            ast.Add: lambda a, b: a + b,
+            ast.Sub: lambda a, b: a - b,
+            ast.Mult: lambda a, b: a * b,
+            ast.Div: lambda a, b: a / b,
+            ast.FloorDiv: lambda a, b: a // b,
+            ast.Mod: lambda a, b: a % b,
+            ast.Pow: lambda a, b: a ** b,
+        }
+        allowed_unary_ops = {
+            ast.UAdd: lambda a: +a,
+            ast.USub: lambda a: -a,
+        }
+
+        def evaluate(node: ast.AST) -> float:
+            if isinstance(node, ast.Expression):
+                return evaluate(node.body)
+
+            if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+                return float(node.value)
+
+            if isinstance(node, ast.Name):
+                if node.id in variables:
+                    return float(variables[node.id])
+                raise ValueError(f"Unknown variable '{node.id}' in formula")
+
+            if isinstance(node, ast.UnaryOp):
+                op = allowed_unary_ops.get(type(node.op))
+                if op is None:
+                    raise ValueError("Unsupported unary operator in formula")
+                return float(op(evaluate(node.operand)))
+
+            if isinstance(node, ast.BinOp):
+                op = allowed_bin_ops.get(type(node.op))
+                if op is None:
+                    raise ValueError("Unsupported operator in formula")
+                return float(op(evaluate(node.left), evaluate(node.right)))
+
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                fn = allowed_functions.get(node.func.id)
+                if fn is None:
+                    raise ValueError(f"Unsupported function '{node.func.id}' in formula")
+                args = [evaluate(arg) for arg in node.args]
+                return float(fn(*args))
+
+            raise ValueError("Unsupported expression in formula")
+
+        parsed = ast.parse(formula, mode="eval")
+        return float(evaluate(parsed))
+
+    @staticmethod
+    def _parse_elapsed_date(date_str: str):
+        """Parse campaign date labels into a comparable marker."""
+        if not isinstance(date_str, str):
+            return None
+
+        value = date_str.strip()
+        if not value:
+            return None
+
+        day_match = re.fullmatch(r"Day\s+(\d+)", value, flags=re.IGNORECASE)
+        if day_match:
+            return ("day-index", int(day_match.group(1)))
+
+        cleaned = re.sub(r"(\d+)(st|nd|rd|th)", r"\1", value, flags=re.IGNORECASE)
+        cleaned = cleaned.replace(",", "")
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        formats = ("%d of %B %Y", "%d %B %Y", "%B %d %Y")
+        for date_fmt in formats:
+            try:
+                parsed = datetime.strptime(cleaned, date_fmt).date()
+                return ("calendar", parsed)
+            except ValueError:
+                continue
+
+        return None
 
     def tick(self, elapsed_hours: float, sleeping: bool = False) -> dict:
         """
@@ -130,7 +220,7 @@ class SurvivalEngine:
                         for name, data in sim_char.get('custom_stats', {}).items()
                     }
                     try:
-                        change_per_hour = float(eval(rule['per_hour_formula'], {"__builtins__": {}}, formula_vars))
+                        change_per_hour = self._safe_eval_formula(rule['per_hour_formula'], formula_vars)
                     except Exception:
                         pass
 
@@ -429,16 +519,15 @@ class SurvivalEngine:
         prev_hours = parse_time(prev_time)
         new_hours = parse_time(new_time)
 
-        date_diff = 0
+        date_diff_days = 0
         if new_date != prev_date:
-            try:
-                prev_day = int(prev_date.split()[0].rstrip('stndrdth'))
-                new_day = int(new_date.split()[0].rstrip('stndrdth'))
-                date_diff = (new_day - prev_day) * 24
-            except (ValueError, IndexError):
-                date_diff = 0
+            parse_date = self._parse_elapsed_date if self is not None else SurvivalEngine._parse_elapsed_date
+            prev_marker = parse_date(prev_date)
+            new_marker = parse_date(new_date)
+            if prev_marker and new_marker and prev_marker[0] == new_marker[0]:
+                date_diff_days = (new_marker[1] - prev_marker[1]).days if prev_marker[0] == "calendar" else (new_marker[1] - prev_marker[1])
 
-        return date_diff + (new_hours - prev_hours)
+        return (date_diff_days * 24) + (new_hours - prev_hours)
 
     def _check_time_consequences(self, elapsed_hours: float) -> list:
         """Check and trigger time-based consequences (trigger_hours field)."""
