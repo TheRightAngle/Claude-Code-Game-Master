@@ -36,7 +36,7 @@ BREADCRUMB_HEIGHT = 30
 
 def _data_hash(data) -> str:
     raw = json.dumps(data, sort_keys=True, ensure_ascii=False)
-    return hashlib.md5(raw.encode()).hexdigest()
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 
 class MapGUI:

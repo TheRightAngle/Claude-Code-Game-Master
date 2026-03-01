@@ -88,7 +88,7 @@ class MapRenderer:
         """Generate stable unique color for location based on name hash"""
         # Hash location name to get consistent color
         import hashlib
-        hash_val = int(hashlib.md5(loc_name.encode()).hexdigest()[:8], 16)
+        hash_val = int(hashlib.sha256(loc_name.encode()).hexdigest()[:8], 16)
 
         # Pick from available colors (excluding gray/white for better visibility)
         color_pool = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan',
@@ -164,7 +164,7 @@ class MapRenderer:
 
         min_x = min(c[0] for c in coords_list)
         max_x = max(c[0] for c in coords_list)
-        min_y = min(c[0] for c in coords_list)
+        min_y = min(c[1] for c in coords_list)
         max_y = max(c[1] for c in coords_list)
 
         # Add padding
