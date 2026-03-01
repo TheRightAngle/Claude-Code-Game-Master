@@ -79,8 +79,9 @@ class WorldSearcher:
         for name, npc_data in npcs.items():
             if not isinstance(npc_data, dict):
                 continue
+            description = str(npc_data.get('description', ''))
             if (query_lower in name.lower() or
-                query_lower in npc_data.get('description', '').lower()):
+                query_lower in description.lower()):
                 results[name] = npc_data
 
         return results
@@ -126,9 +127,11 @@ class WorldSearcher:
         for name, loc_data in locations.items():
             if not isinstance(loc_data, dict):
                 continue
+            description = str(loc_data.get('description', ''))
+            position = str(loc_data.get('position', ''))
             if (query_lower in name.lower() or
-                query_lower in loc_data.get('description', '').lower() or
-                query_lower in loc_data.get('position', '').lower()):
+                query_lower in description.lower() or
+                query_lower in position.lower()):
                 results[name] = loc_data
 
         return results
@@ -350,8 +353,9 @@ class WorldSearcher:
                 print(f"  - {name}: {loc.get('position', '')}")
                 if loc.get('description'):
                     print(f"    {self._format_text(loc['description'], full=full, limit=260)}")
-                if loc.get('connections'):
-                    print(f"    Connections: {len(loc['connections'])}")
+                connections = loc.get('connections', [])
+                if isinstance(connections, list):
+                    print(f"    Connections: {len(connections)}")
 
         if results.get('consequences'):
             print("\nCONSEQUENCES:")

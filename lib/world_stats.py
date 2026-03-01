@@ -71,8 +71,10 @@ class WorldStats:
         # Consequences
         consequences = self.json_ops.load_json("consequences.json")
         if isinstance(consequences, dict):
-            counts["consequences_active"] = len(consequences.get("active", []))
-            counts["consequences_resolved"] = len(consequences.get("resolved", []))
+            active = consequences.get("active", [])
+            resolved = consequences.get("resolved", [])
+            counts["consequences_active"] = len(active) if isinstance(active, list) else 0
+            counts["consequences_resolved"] = len(resolved) if isinstance(resolved, list) else 0
 
         # Plots
         plots = self.json_ops.load_json("plots.json")

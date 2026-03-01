@@ -134,3 +134,48 @@ def test_getters_handle_malformed_root_payloads(tmp_path):
     assert searcher.get_location("Town") is None
     assert searcher.get_pending_consequences() == []
     assert searcher.get_facts_by_category("lore") == []
+
+
+def test_search_npcs_and_locations_tolerate_non_string_fields(tmp_path):
+    ws, camp = make_world_state(tmp_path)
+    (camp / "npcs.json").write_text(
+        json.dumps(
+            {
+                "Captain Rook": {"description": 101, "attitude": "alert"},
+            },
+            ensure_ascii=False,
+        )
+    )
+    (camp / "locations.json").write_text(
+        json.dumps(
+            {
+                "Harbor Watch": {"description": 202, "position": 303},
+            },
+            ensure_ascii=False,
+        )
+    )
+
+    searcher = WorldSearcher(str(ws))
+
+    assert searcher.search_npcs("nomatch") == {}
+    assert searcher.search_locations("nomatch") == {}
+
+
+def test_print_results_tolerates_non_list_location_connections(tmp_path, capsys):
+    ws, _ = make_world_state(tmp_path)
+    searcher = WorldSearcher(str(ws))
+
+    searcher.print_results(
+        {
+            "locations": {
+                "Harbor Watch": {
+                    "position": "North",
+                    "description": "Gatehouse",
+                    "connections": 7,
+                }
+            }
+        }
+    )
+
+    output = capsys.readouterr().out
+    assert "LOCATIONS" in output

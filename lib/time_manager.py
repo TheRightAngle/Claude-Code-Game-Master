@@ -23,6 +23,9 @@ class TimeManager:
     def update_time(self, time_of_day: str, date: str) -> dict | bool:
         """Update the campaign time and date."""
         data = self.json_ops.load_json("campaign-overview.json")
+        if not isinstance(data, dict):
+            print("[ERROR] Invalid campaign-overview.json format")
+            return False
 
         data['time_of_day'] = time_of_day
         data['current_date'] = date
@@ -45,6 +48,8 @@ class TimeManager:
     def get_time(self) -> dict:
         """Get current campaign time."""
         data = self.json_ops.load_json("campaign-overview.json")
+        if not isinstance(data, dict):
+            data = {}
         time_data = data.get('time', {})
         if not isinstance(time_data, dict):
             time_data = {}

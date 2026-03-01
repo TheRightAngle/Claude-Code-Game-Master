@@ -39,3 +39,17 @@ def test_update_time_syncs_nested_and_top_level_fields(tmp_path):
     assert data["time"]["time_of_day"] == "Night"
     assert data["time"]["current_date"] == "Day 2"
     assert data["time"]["calendar"] == "Default"
+
+
+def test_time_manager_handles_non_dict_overview_payload(tmp_path):
+    ws, camp = make_world_state(tmp_path)
+    (camp / "campaign-overview.json").write_text(
+        json.dumps(["not-a-dict"], ensure_ascii=False)
+    )
+    manager = TimeManager(str(ws))
+
+    update_result = manager.update_time("Night", "Day 2")
+    current_time = manager.get_time()
+
+    assert update_result is False
+    assert current_time == {"time_of_day": "Unknown", "current_date": "Unknown"}

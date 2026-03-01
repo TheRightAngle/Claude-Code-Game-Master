@@ -99,3 +99,20 @@ def test_get_current_status_handles_non_dict_player_position(tmp_path):
     assert status["current_location"] is None
     assert status["time_of_day"] == "Morning"
     assert status["current_date"] == "Day 1"
+
+
+def test_world_stats_counts_tolerate_non_list_consequences(tmp_path):
+    ws, camp = make_world_state(tmp_path)
+    (camp / "consequences.json").write_text(
+        json.dumps(
+            {"active": 1, "resolved": 2},
+            ensure_ascii=False,
+        )
+    )
+
+    stats = WorldStats(str(ws))
+
+    counts = stats.get_counts()
+
+    assert counts["consequences_active"] == 0
+    assert counts["consequences_resolved"] == 0
