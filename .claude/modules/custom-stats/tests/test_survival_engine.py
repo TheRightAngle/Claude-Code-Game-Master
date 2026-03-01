@@ -512,6 +512,20 @@ class TestElapsedHours:
 
         assert elapsed == 2.0
 
+    def test_elapsed_hours_supports_ordinal_day_labels(self):
+        sys.path.insert(0, str(PROJECT_ROOT / ".claude" / "modules" / "custom-stats" / "lib"))
+        from survival_engine import SurvivalEngine
+
+        elapsed = SurvivalEngine._calculate_elapsed_hours(
+            None,
+            prev_time="10:00",
+            new_time="12:30",
+            prev_date="3rd day",
+            new_date="4th day",
+        )
+
+        assert elapsed == 26.5
+
 
 # ─── Tests: Status Display ─────────────────────────────────
 

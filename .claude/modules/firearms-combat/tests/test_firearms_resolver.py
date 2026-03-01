@@ -152,6 +152,38 @@ def test_full_auto_multi_target(fake_campaign):
     assert total_shots == 30
 
 
+def test_full_auto_distributes_remainder_shots_without_loss(fake_campaign):
+    """Shots must be fully allocated when shots_fired is not divisible by targets."""
+    resolver = FirearmsCombatResolver(str(fake_campaign))
+
+    targets = [
+        {"name": "Snork A", "ac": 12, "hp": 15, "prot": 2},
+        {"name": "Snork B", "ac": 12, "hp": 15, "prot": 2},
+        {"name": "Snork C", "ac": 12, "hp": 15, "prot": 2},
+    ]
+
+    result = resolver.resolve_full_auto("AK-74", ammo_available=10, targets=targets)
+
+    assert result["shots_fired"] == 10
+    assert sum(t["shots"] for t in result["targets"]) == 10
+
+
+def test_full_auto_does_not_allocate_phantom_shots(fake_campaign):
+    """If ammo is lower than target count, allocation must still equal shots_fired."""
+    resolver = FirearmsCombatResolver(str(fake_campaign))
+
+    targets = [
+        {"name": "Snork A", "ac": 12, "hp": 15, "prot": 2},
+        {"name": "Snork B", "ac": 12, "hp": 15, "prot": 2},
+        {"name": "Snork C", "ac": 12, "hp": 15, "prot": 2},
+    ]
+
+    result = resolver.resolve_full_auto("AK-74", ammo_available=2, targets=targets)
+
+    assert result["shots_fired"] == 2
+    assert sum(t["shots"] for t in result["targets"]) == 2
+
+
 def test_combat_output_formatting(fake_campaign):
     """Test combat result output formatting"""
     resolver = FirearmsCombatResolver(str(fake_campaign))

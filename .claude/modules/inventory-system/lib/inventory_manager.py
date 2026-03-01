@@ -143,7 +143,9 @@ class InventoryManager:
 
             stackable = inventory.get("stackable", {})
 
-            if item not in stackable:
+            if quantity < 0:
+                errors.append(f"Cannot remove a negative quantity for '{item}': {quantity}")
+            elif item not in stackable:
                 errors.append(f"Item '{item}' not found in inventory")
             elif stackable[item] < quantity:
                 errors.append(f"Cannot remove {quantity}x {item} (only {stackable[item]} available)")
@@ -550,6 +552,15 @@ def main():
 
     # Initialize manager
     manager = InventoryManager(campaign_path)
+
+    provided_character = getattr(args, "character", None)
+    active_character = manager.character.get("name")
+    if provided_character and provided_character != active_character:
+        print(
+            f"[ERROR] Provided character '{provided_character}' does not match active character '{active_character}'",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Execute command
     if args.command == 'show':

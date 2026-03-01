@@ -21,6 +21,8 @@ def test_move_uses_custom_stats_survival_hook(monkeypatch, tmp_path):
     (campaign_dir / "campaign-overview.json").write_text(json.dumps({
         "current_location": "Alpha",
         "player_position": {"current_location": "Alpha"},
+        "time_of_day": "Evening",
+        "current_date": "April 16th, 2012",
     }))
     (campaign_dir / "character.json").write_text(json.dumps({"speed_kmh": 4.0}))
     (campaign_dir / "locations.json").write_text(json.dumps({
@@ -57,6 +59,13 @@ def test_move_uses_custom_stats_survival_hook(monkeypatch, tmp_path):
     assert "cmd" in called
     assert "custom-stats/tools/dm-survival.sh" in called["cmd"][1]
     assert "survival-stats" not in called["cmd"][1]
+    assert called["cmd"][2:7] == [
+        "time",
+        "Evening",
+        "April 16th, 2012",
+        "--elapsed",
+        "0.25",
+    ]
 
 
 def test_move_suppresses_session_stdout_when_emit_logs_false(monkeypatch, tmp_path, capsys):

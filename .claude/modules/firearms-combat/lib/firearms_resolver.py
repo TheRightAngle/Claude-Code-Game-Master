@@ -144,11 +144,18 @@ class FirearmsCombatResolver:
         weapon = self._get_weapon_stats(weapon_name)
         fire_mode = self._get_fire_mode_config("full_auto")
 
+        if not targets:
+            raise ValueError("At least one target is required")
+
         max_rounds_per_round = self._calculate_rounds_per_dnd_round(weapon["rpm"])
         shots_fired = min(ammo_available, max_rounds_per_round)
-        shots_per_target = shots_fired // len(targets)
-        if shots_per_target == 0:
-            shots_per_target = 1
+        target_count = len(targets)
+        shots_per_target = shots_fired // target_count
+        shots_remainder = shots_fired % target_count
+        shots_allocation = [
+            shots_per_target + (1 if idx < shots_remainder else 0)
+            for idx in range(target_count)
+        ]
 
         base_attack = self._get_attack_bonus()
         is_sharpshooter = self._is_sharpshooter()
@@ -164,19 +171,20 @@ class FirearmsCombatResolver:
         total_xp = 0
 
         for target_idx, target in enumerate(targets):
+            allocated_shots = shots_allocation[target_idx]
             target_result = {
                 "name": target["name"],
                 "ac": target["ac"],
                 "initial_hp": target["hp"],
                 "prot": target["prot"],
-                "shots": shots_per_target,
+                "shots": allocated_shots,
                 "hits": [],
                 "damage_dealt": 0,
                 "final_hp": target["hp"],
                 "killed": False
             }
 
-            for shot_num in range(shots_per_target):
+            for shot_num in range(allocated_shots):
                 penalty = shot_num * penalty_per_shot
                 attack_mod = base_attack + penalty
 

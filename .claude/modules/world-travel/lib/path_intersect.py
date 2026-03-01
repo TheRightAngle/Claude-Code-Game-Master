@@ -98,6 +98,14 @@ def find_route_with_waypoints(start_name: str, end_name: str,
     Returns:
         List of location names forming the route [start, waypoint1, waypoint2, ..., end]
     """
+    if start_name not in locations or end_name not in locations:
+        return []
+
+    start_coords = locations[start_name].get('coordinates')
+    end_coords = locations[end_name].get('coordinates')
+    if not start_coords or not end_coords:
+        return []
+
     # Check direct path
     intersections = check_path_intersection(start_name, end_name, locations)
 
@@ -107,7 +115,6 @@ def find_route_with_waypoints(start_name: str, end_name: str,
 
     # Path intersects locations - need to route through them
     # Build route by ordering intersected locations by distance from start
-    start_coords = locations[start_name]['coordinates']
     start_x, start_y = start_coords['x'], start_coords['y']
 
     # Calculate distance from start for each intersection

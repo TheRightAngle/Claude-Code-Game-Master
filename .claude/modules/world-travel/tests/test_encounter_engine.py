@@ -274,6 +274,12 @@ def test_waypoint_cleanup(campaign_dir):
     # Verify it's gone
     assert engine.is_waypoint(waypoint_name) is False
 
+    # Verify backlinks to waypoint are cleaned from all locations
+    locations = json.loads((campaign_dir / "locations.json").read_text())
+    for loc_data in locations.values():
+        for conn in loc_data.get("connections", []):
+            assert conn.get("to") != waypoint_name
+
 
 def test_is_waypoint(campaign_dir):
     """Test waypoint detection"""

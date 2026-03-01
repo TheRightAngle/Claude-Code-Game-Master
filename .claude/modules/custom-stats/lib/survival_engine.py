@@ -117,6 +117,10 @@ class SurvivalEngine:
         if day_match:
             return ("day-index", int(day_match.group(1)))
 
+        ordinal_day_match = re.fullmatch(r"(\d+)(?:st|nd|rd|th)?\s+day", value, flags=re.IGNORECASE)
+        if ordinal_day_match:
+            return ("day-index", int(ordinal_day_match.group(1)))
+
         cleaned = re.sub(r"(\d+)(st|nd|rd|th)", r"\1", value, flags=re.IGNORECASE)
         cleaned = cleaned.replace(",", "")
         cleaned = re.sub(r"\s+", " ", cleaned).strip()

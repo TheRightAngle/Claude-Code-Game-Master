@@ -361,9 +361,28 @@ class NavigationManager:
                     if emit_logs:
                         print("[WARNING] bash executable not found; skipping custom-stats time advance")
                 else:
+                    time_data = campaign_overview.get("time", {})
+                    if not isinstance(time_data, dict):
+                        time_data = {}
+                    time_of_day = campaign_overview.get("time_of_day") or time_data.get("time_of_day") or "Day"
+                    current_date = (
+                        campaign_overview.get("current_date")
+                        or campaign_overview.get("date")
+                        or time_data.get("current_date")
+                        or time_data.get("date")
+                        or "Unknown"
+                    )
                     try:
                         result = subprocess.run(
-                            [bash_path, str(survival_stats_script), "time", str(elapsed_hours)],
+                            [
+                                bash_path,
+                                str(survival_stats_script),
+                                "time",
+                                str(time_of_day),
+                                str(current_date),
+                                "--elapsed",
+                                str(elapsed_hours),
+                            ],
                             capture_output=True,
                             text=True,
                             check=False

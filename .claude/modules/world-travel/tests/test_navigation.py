@@ -157,6 +157,17 @@ class TestPathIntersection:
         assert "D" in route
         assert route.index("C") < route.index("D")  # C comes before D
 
+    def test_find_route_with_waypoints_missing_start_returns_empty(self):
+        """Missing endpoints should fail safely instead of returning a fake route."""
+        locations = {
+            "B": {"coordinates": {"x": 2000, "y": 0}, "diameter_meters": 100},
+            "C": {"coordinates": {"x": 500, "y": 50}, "diameter_meters": 150},
+        }
+
+        route = find_route_with_waypoints("A", "B", locations)
+
+        assert route == []
+
 
 class TestNavigationIntegration:
     """Integration tests for navigation manager"""

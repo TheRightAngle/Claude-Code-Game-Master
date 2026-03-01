@@ -344,6 +344,12 @@ class EncounterEngine:
         locations = self.json_ops.load_json("locations.json") or {}
 
         if waypoint_name in locations and locations[waypoint_name].get('is_waypoint'):
+            for loc_data in locations.values():
+                connections = loc_data.get('connections', [])
+                loc_data['connections'] = [
+                    conn for conn in connections
+                    if conn.get('to') != waypoint_name
+                ]
             del locations[waypoint_name]
             self.json_ops.save_json("locations.json", locations)
             print(f"[CLEANUP] Removed waypoint: {waypoint_name}")
