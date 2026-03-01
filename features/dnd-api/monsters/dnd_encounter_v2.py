@@ -19,6 +19,11 @@ from dnd_api_core import fetch, output, error_output
 
 BASE_URL = "https://www.dnd5eapi.co"
 REQUEST_TIMEOUT = 10
+FRACTIONAL_CR_VALUES = {
+    "1/8": 0.125,
+    "1/4": 0.25,
+    "1/2": 0.5,
+}
 
 
 def _validated_base_url():
@@ -33,6 +38,17 @@ def _urlopen_with_timeout(url):
     request = urllib.request.Request(url)
     opener = urllib.request.build_opener()
     return opener.open(request, timeout=REQUEST_TIMEOUT)
+
+
+def parse_cr_value(value):
+    """Parse CR values from CLI, including common fractional CR notation."""
+    normalized = str(value).strip()
+    if normalized in FRACTIONAL_CR_VALUES:
+        return FRACTIONAL_CR_VALUES[normalized]
+    try:
+        return float(normalized)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid CR value: {value!r}") from exc
 
 
 def get_monsters_by_cr(target_cr):
@@ -68,7 +84,7 @@ def get_monsters_by_cr(target_cr):
 
 def main():
     parser = argparse.ArgumentParser(description='Quick D&D encounter helper')
-    parser.add_argument('--cr', type=float, required=True, help='Challenge rating')
+    parser.add_argument('--cr', type=parse_cr_value, required=True, help='Challenge rating')
     parser.add_argument('--count', type=int, default=1, help='Number of monsters')
     parser.add_argument('--quick', action='store_true', help='Just return monster names')
     

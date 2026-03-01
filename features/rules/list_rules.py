@@ -40,6 +40,9 @@ def main():
     parser.add_argument('--sections', action='store_true', help='List rule sections instead')
     
     args = parser.parse_args()
+
+    if args.limit < 0:
+        error_output("--limit must be 0 or greater")
     
     # Fetch the appropriate endpoint
     if args.sections:
@@ -57,7 +60,7 @@ def main():
         rules = filter_rules(rules, args)
     
     # Apply limit
-    if args.limit and len(rules) > args.limit:
+    if len(rules) > args.limit:
         rules = rules[:args.limit]
     
     # Format output

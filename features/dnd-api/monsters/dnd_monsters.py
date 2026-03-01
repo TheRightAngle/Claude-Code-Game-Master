@@ -91,7 +91,7 @@ MONSTER_CR_TABLE = {
     "gold-dragon-wyrmling": 3, "green-hag": 3, "hell-hound": 3, "hobgoblin-captain": 3,
     "hook-horror": 3, "killer-whale": 3, "knight": 3, "manticore": 3, "minotaur": 3,
     "mummy": 3, "neogi": 3, "nightmare": 3, "owlbear": 3, "phase-spider": 3, "quaggoth-thonot": 3,
-    "red-dragon-wyrmling": 3, "shadow-demon": 3, "spectator": 3, "vampire-spawn": 3,
+    "red-dragon-wyrmling": 4, "shadow-demon": 3, "spectator": 3, "vampire-spawn": 3,
     "water-weird": 3, "werewolf": 3, "wight": 3, "winter-wolf": 3, "yeti": 3,
     "yuan-ti-malison": 3,
     
@@ -109,18 +109,43 @@ MONSTER_CR_TABLE = {
     "werebear": 5, "wraith": 5, "xorn": 5, "young-remorhaz": 5, "yuan-ti-abomination": 5,
 }
 
+FRACTIONAL_CR_VALUES = {
+    "1/8": 0.125,
+    "1/4": 0.25,
+    "1/2": 0.5,
+}
+
+
+def parse_cr_value(cr_value):
+    """Parse CR numeric or fractional values into floats."""
+    if isinstance(cr_value, bool):
+        raise ValueError("CR cannot be bool")
+
+    if isinstance(cr_value, (int, float)):
+        return float(cr_value)
+
+    if isinstance(cr_value, str):
+        normalized = cr_value.strip()
+        if normalized in FRACTIONAL_CR_VALUES:
+            return FRACTIONAL_CR_VALUES[normalized]
+        return float(normalized)
+
+    raise ValueError(f"Unsupported CR value: {cr_value}")
+
+
 def parse_cr_range(cr_str):
     """Parse CR input like '5' or '1-5' into min/max values"""
     if '-' in cr_str:
-        parts = cr_str.split('-')
+        parts = cr_str.split('-', 1)
         if len(parts) == 2:
             try:
-                return float(parts[0]), float(parts[1])
+                return parse_cr_value(parts[0]), parse_cr_value(parts[1])
             except ValueError:
                 error_output(f"Invalid CR range: {cr_str}")
+        error_output(f"Invalid CR range: {cr_str}")
     else:
         try:
-            cr = float(cr_str)
+            cr = parse_cr_value(cr_str)
             return cr, cr
         except ValueError:
             error_output(f"Invalid CR value: {cr_str}")
@@ -169,7 +194,7 @@ def filter_monsters_instant(monsters, args):
             if "error" not in details:
                 monster_cr = details.get("challenge_rating", 0)
                 try:
-                    monster_cr = float(monster_cr)
+                    monster_cr = parse_cr_value(monster_cr)
                     if cr_min <= monster_cr <= cr_max:
                         results.append({**monster, "cr": monster_cr})
                 except (ValueError, TypeError):
@@ -184,6 +209,9 @@ def main():
     parser.add_argument('--limit', type=int, default=50, help='Max results (default: 50)')
     
     args = parser.parse_args()
+
+    if args.limit < 0:
+        error_output("--limit must be 0 or greater")
     
     # Fetch all monsters
     data = fetch("/monsters")
@@ -196,15 +224,18 @@ def main():
     # Apply filters
     if args.cr or args.search:
         monsters = filter_monsters_instant(monsters, args)
+
+    matched_total = len(monsters)
     
     # Apply limit
-    if args.limit and len(monsters) > args.limit:
+    if len(monsters) > args.limit:
         monsters = monsters[:args.limit]
     
     # Format output
     output({
         "count": len(monsters),
-        "total": data.get("count", 0),
+        "total": matched_total,
+        "available_total": data.get("count", 0),
         "results": monsters
     })
 

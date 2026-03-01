@@ -14,6 +14,11 @@ import urllib.error
 
 BASE_URL = "https://www.dnd5eapi.co"
 REQUEST_TIMEOUT = 10
+FRACTIONAL_CR_VALUES = {
+    "1/8": 0.125,
+    "1/4": 0.25,
+    "1/2": 0.5,
+}
 
 
 def _validated_base_url() -> str:
@@ -28,6 +33,17 @@ def _urlopen_with_timeout(url: str):
     request = urllib.request.Request(url)
     opener = urllib.request.build_opener()
     return opener.open(request, timeout=REQUEST_TIMEOUT)
+
+
+def parse_cr_value(value: str) -> float:
+    """Parse CR values from CLI, including common fractional notation."""
+    normalized = str(value).strip()
+    if normalized in FRACTIONAL_CR_VALUES:
+        return FRACTIONAL_CR_VALUES[normalized]
+    try:
+        return float(normalized)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid CR value: {value!r}") from exc
 
 
 def fetch_monsters(
@@ -46,6 +62,9 @@ def fetch_monsters(
     Returns:
         API response containing monster list
     """
+    if limit is not None and limit < 0:
+        return {"error": "--limit must be 0 or greater"}
+
     try:
         url = f"{_validated_base_url()}/api/2014/monsters"
         params = []
@@ -108,7 +127,7 @@ def main():
     )
     parser.add_argument(
         "--cr",
-        type=float,
+        type=parse_cr_value,
         action="append",
         help="Filter by challenge rating (can be used multiple times)"
     )
@@ -129,6 +148,10 @@ def main():
     )
     
     args = parser.parse_args()
+
+    if args.limit is not None and args.limit < 0:
+        print("Error: --limit must be 0 or greater", file=sys.stderr)
+        sys.exit(1)
     
     # Fetch monsters with filters
     result = fetch_monsters(

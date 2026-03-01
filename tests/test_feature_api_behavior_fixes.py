@@ -502,3 +502,139 @@ def test_filter_spells_applies_search_before_fetching_details(monkeypatch):
 
     assert details_calls == ["fire-bolt"]
     assert filtered[0]["name"] == "Fire Bolt"
+
+
+@pytest.mark.parametrize("bad_level", [True, False, 0, -1, 1.5, "2", None])
+def test_save_character_rejects_invalid_level_values(bad_level):
+    module = load_module("features/character-creation/save_character.py")
+
+    result = module.save_character(
+        {
+            "name": "Tess",
+            "race": "Human",
+            "class": "Fighter",
+            "level": bad_level,
+            "stats": {"str": 14, "dex": 12, "con": 13, "int": 10, "wis": 10, "cha": 8},
+        }
+    )
+
+    assert "error" in result
+    assert "level" in result["error"].lower()
+
+
+def test_dnd_monsters_cr_table_has_correct_red_dragon_wyrmling_cr():
+    module = load_module("features/dnd-api/monsters/dnd_monsters.py")
+    assert module.MONSTER_CR_TABLE["red-dragon-wyrmling"] == 4
+
+
+def test_dnd_monsters_fractional_cr_range_parsing():
+    module = load_module("features/dnd-api/monsters/dnd_monsters.py")
+
+    assert module.parse_cr_range("1/2") == (0.5, 0.5)
+    assert module.parse_cr_range("1/8-1/4") == (0.125, 0.25)
+
+
+def test_dnd_monsters_filtered_total_reflects_matches_before_limit(monkeypatch):
+    module = load_module("features/dnd-api/monsters/dnd_monsters.py")
+    captured = {}
+
+    def fake_fetch(endpoint):
+        assert endpoint == "/monsters"
+        return {
+            "count": 3,
+            "results": [
+                {"index": "red-dragon-wyrmling", "name": "Red Dragon Wyrmling"},
+                {"index": "blue-dragon-wyrmling", "name": "Blue Dragon Wyrmling"},
+                {"index": "goblin", "name": "Goblin"},
+            ],
+        }
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+    monkeypatch.setattr(module, "output", lambda payload: captured.setdefault("payload", payload))
+    monkeypatch.setattr(module.sys, "argv", ["dnd_monsters.py", "--search", "dragon", "--limit", "1"])
+
+    module.main()
+
+    assert captured["payload"]["count"] == 1
+    assert captured["payload"]["total"] == 2
+
+
+def test_encounter_v2_accepts_fractional_cr_cli(monkeypatch):
+    module = load_module("features/dnd-api/monsters/dnd_encounter_v2.py")
+    captured = {}
+
+    def fake_get_monsters_by_cr(cr):
+        captured["cr"] = cr
+        return [{"index": "wolf", "name": "Wolf"}]
+
+    monkeypatch.setattr(module, "get_monsters_by_cr", fake_get_monsters_by_cr)
+    monkeypatch.setattr(module.random, "sample", lambda items, count: items[:count])
+    monkeypatch.setattr(module, "output", lambda payload: captured.setdefault("payload", payload))
+    monkeypatch.setattr(module.sys, "argv", ["dnd_encounter_v2.py", "--cr", "1/2", "--count", "1", "--quick"])
+
+    module.main()
+
+    assert captured["cr"] == 0.5
+    assert captured["payload"]["cr"] == 0.5
+
+
+def test_monsters_api_filter_accepts_fractional_cr_cli(monkeypatch):
+    module = load_module("features/dnd-api/monsters/dnd_monsters_api_filter.py")
+    captured = {}
+
+    def fake_fetch_monsters(challenge_ratings=None, limit=None, search=None):
+        captured["challenge_ratings"] = challenge_ratings
+        captured["limit"] = limit
+        captured["search"] = search
+        return {"count": 0, "results": []}
+
+    monkeypatch.setattr(module, "fetch_monsters", fake_fetch_monsters)
+    monkeypatch.setattr(module.sys, "argv", ["dnd_monsters_api_filter.py", "--cr", "1/4", "--json"])
+
+    module.main()
+
+    assert captured["challenge_ratings"] == [0.25]
+
+
+@pytest.mark.parametrize(
+    ("module_path", "argv"),
+    [
+        ("features/rules/list_rules.py", ["list_rules.py", "--limit", "-1"]),
+        ("features/dnd-api/monsters/dnd_monsters.py", ["dnd_monsters.py", "--limit", "-1"]),
+        ("features/gear/dnd_equipment_list.py", ["dnd_equipment_list.py", "--limit", "-1"]),
+    ],
+)
+def test_cli_tools_reject_negative_limit_before_fetch(module_path, argv, monkeypatch):
+    module = load_module(module_path)
+
+    monkeypatch.setattr(module, "fetch", lambda _endpoint: (_ for _ in ()).throw(AssertionError("must not fetch")))
+    monkeypatch.setattr(module, "error_output", lambda message: (_ for _ in ()).throw(RuntimeError(message)))
+    monkeypatch.setattr(module.sys, "argv", argv)
+
+    with pytest.raises(RuntimeError, match="--limit must be 0 or greater"):
+        module.main()
+
+
+def test_monsters_api_filter_rejects_negative_limit_before_fetch(monkeypatch, capsys):
+    module = load_module("features/dnd-api/monsters/dnd_monsters_api_filter.py")
+
+    monkeypatch.setattr(
+        module, "fetch_monsters", lambda **_kwargs: (_ for _ in ()).throw(AssertionError("must not fetch"))
+    )
+    monkeypatch.setattr(module.sys, "argv", ["dnd_monsters_api_filter.py", "--limit", "-1"])
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+
+    stderr = capsys.readouterr().err
+    assert exc.value.code == 1
+    assert "--limit must be 0 or greater" in stderr
+
+
+def test_combat_rules_death_saves_text_uses_death_saving_throw_not_con_save():
+    module = load_module("features/rules/combat_rules.py")
+
+    death_saves_text = module.COMBAT_TOPICS["death"]["content"]["Death Saves"]
+    assert "DC 10" in death_saves_text
+    assert "death saving throw" in death_saves_text.lower()
+    assert "con save" not in death_saves_text.lower()

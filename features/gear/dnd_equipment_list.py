@@ -62,6 +62,9 @@ def main():
     parser.add_argument('--list-categories', action='store_true', help='List all available categories')
     
     args = parser.parse_args()
+
+    if args.limit < 0:
+        error_output("--limit must be 0 or greater")
     
     # List categories if requested
     if args.list_categories:
@@ -86,7 +89,7 @@ def main():
             equipment = [item for item in equipment if args.search.lower() in item["name"].lower()]
         
         # Apply limit
-        if args.limit and len(equipment) > args.limit:
+        if len(equipment) > args.limit:
             equipment = equipment[:args.limit]
         
         output({
@@ -110,7 +113,7 @@ def main():
     
     # Apply limit
     total_count = len(equipment)
-    if args.limit and len(equipment) > args.limit:
+    if len(equipment) > args.limit:
         equipment = equipment[:args.limit]
     
     # Format output

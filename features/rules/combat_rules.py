@@ -84,7 +84,7 @@ COMBAT_TOPICS = {
         "description": "Rules for 0 hit points",
         "content": {
             "Unconscious": "At 0 HP, fall unconscious",
-            "Death Saves": "DC 10 Con save, 3 successes = stable, 3 failures = death",
+            "Death Saves": "DC 10 death saving throw, 3 successes = stable, 3 failures = death",
             "Natural 20": "Regain 1 HP and consciousness",
             "Natural 1": "Counts as 2 failures",
             "Damage at 0 HP": "Auto-fail 1 death save (2 if crit)"

@@ -9,7 +9,7 @@ import json
 import sys
 import os
 import re
-from numbers import Real
+from numbers import Integral, Real
 from pathlib import Path
 
 # Add lib directory to path for imports
@@ -118,6 +118,10 @@ def save_character(character_data):
         value = character_data['stats'][stat]
         if isinstance(value, bool) or not isinstance(value, Real):
             return {"error": f"Invalid stat value for '{stat}': expected a number"}
+
+    level = character_data.get('level')
+    if isinstance(level, bool) or not isinstance(level, Integral) or level < 1:
+        return {"error": "Field 'level' must be an integer greater than or equal to 1"}
 
     # Generate character ID
     char_id = create_character_id(character_data['name'])
