@@ -194,6 +194,31 @@ def test_roll_encounter_nature(campaign_dir):
             assert nature['category'] == "Special"
 
 
+def test_roll_encounter_nature_with_luck_uses_campaign_character(campaign_dir, monkeypatch):
+    """use_luck should read luck from the direct campaign character context."""
+    overview_path = campaign_dir / "campaign-overview.json"
+    with open(overview_path, "r") as f:
+        overview = json.load(f)
+    overview["campaign_rules"]["encounter_system"]["use_luck"] = True
+    with open(overview_path, "w") as f:
+        json.dump(overview, f)
+
+    character_path = campaign_dir / "character.json"
+    with open(character_path, "r") as f:
+        character = json.load(f)
+    character.setdefault("abilities", {})["luck"] = 14
+    with open(character_path, "w") as f:
+        json.dump(character, f)
+
+    monkeypatch.setattr("encounter_engine.dice_roll", lambda _: 10)
+
+    engine = EncounterEngine(str(campaign_dir))
+    nature = engine.roll_encounter_nature()
+
+    assert nature["roll"] == 12
+    assert nature["category"] == "Beneficial"
+
+
 def test_check_journey_skipped_too_short(campaign_dir):
     """Test journey skip for distances below minimum"""
     engine = EncounterEngine(str(campaign_dir))

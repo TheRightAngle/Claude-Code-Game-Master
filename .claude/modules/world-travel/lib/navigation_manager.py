@@ -321,6 +321,9 @@ class NavigationManager:
         import io
         from contextlib import redirect_stderr, redirect_stdout
 
+        if speed_multiplier <= 0:
+            return {"success": False, "error": "speed_multiplier must be greater than 0"}
+
         campaign_overview = self.json_ops.load_json("campaign-overview.json")
         character_data = self.json_ops.load_json("character.json")
         locations = self.json_ops.load_json("locations.json")

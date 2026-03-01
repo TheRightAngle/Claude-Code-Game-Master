@@ -42,7 +42,7 @@ class EncounterEngine:
     @property
     def player_mgr(self):
         if self._player_mgr is None:
-            self._player_mgr = PlayerManager(str(self.campaign_dir))
+            self._player_mgr = PlayerManager(str(self.campaign_dir), require_active_campaign=False)
         return self._player_mgr
 
     def is_enabled(self) -> bool:

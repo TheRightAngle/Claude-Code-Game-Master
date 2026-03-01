@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 
 MODULE_DIR = Path(__file__).parent.parent / "lib"
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
@@ -66,6 +68,49 @@ def test_move_uses_custom_stats_survival_hook(monkeypatch, tmp_path):
         "--elapsed",
         "0.25",
     ]
+
+
+@pytest.mark.parametrize("speed_multiplier", [0, -1.0])
+def test_move_rejects_non_positive_speed_multiplier(monkeypatch, tmp_path, speed_multiplier):
+    campaign_dir = tmp_path / "campaign"
+    campaign_dir.mkdir()
+
+    (campaign_dir / "campaign-overview.json").write_text(json.dumps({
+        "current_location": "Alpha",
+        "player_position": {"current_location": "Alpha"},
+    }))
+    (campaign_dir / "character.json").write_text(json.dumps({"speed_kmh": 4.0}))
+    (campaign_dir / "locations.json").write_text(json.dumps({
+        "Alpha": {
+            "position": "A",
+            "coordinates": {"x": 0, "y": 0},
+            "connections": [{"to": "Bravo", "distance_meters": 1000, "terrain": "open"}],
+        },
+        "Bravo": {
+            "position": "B",
+            "coordinates": {"x": 1000, "y": 0},
+            "connections": [],
+        },
+    }))
+
+    manager = NavigationManager(str(campaign_dir))
+
+    class FailSessionManager:
+        def move_party(self, location):
+            raise AssertionError("move_party should not be called for invalid speed multiplier")
+
+    def fail_run(*args, **kwargs):
+        raise AssertionError("subprocess.run should not be called for invalid speed multiplier")
+
+    monkeypatch.setattr("navigation_manager.SessionManager", FailSessionManager)
+    monkeypatch.setattr("subprocess.run", fail_run)
+
+    result = manager.move_with_navigation("Bravo", speed_multiplier=speed_multiplier)
+
+    assert result == {
+        "success": False,
+        "error": "speed_multiplier must be greater than 0",
+    }
 
 
 def test_move_suppresses_session_stdout_when_emit_logs_false(monkeypatch, tmp_path, capsys):
