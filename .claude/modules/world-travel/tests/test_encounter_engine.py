@@ -224,6 +224,22 @@ def test_check_journey_basic(campaign_dir):
         assert 'can_turn_back' in wp
 
 
+def test_check_journey_malformed_precise_time_uses_default(campaign_dir):
+    """Malformed precise_time must not crash journey checks."""
+    overview_path = campaign_dir / "campaign-overview.json"
+    with open(overview_path, "r") as f:
+        overview = json.load(f)
+    overview["precise_time"] = "not-a-time"
+    with open(overview_path, "w") as f:
+        json.dump(overview, f)
+
+    engine = EncounterEngine(str(campaign_dir))
+    journey = engine.check_journey("Village", "Ruins", 2000, "open")
+
+    assert journey["skipped"] is False
+    assert journey["waypoints"][0]["current_time"] == "08:30"
+
+
 def test_waypoint_creation(campaign_dir):
     """Test waypoint location creation"""
     engine = EncounterEngine(str(campaign_dir))

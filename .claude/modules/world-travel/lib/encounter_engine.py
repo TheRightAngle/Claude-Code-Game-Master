@@ -219,6 +219,12 @@ class EncounterEngine:
         overview = self.json_ops.load_json("campaign-overview.json") or {}
         current_time = overview.get('precise_time', '08:00')
         time_of_day = overview.get('time_of_day', 'Day')
+        try:
+            hours, minutes = map(int, str(current_time).split(':'))
+            if not (0 <= hours <= 23 and 0 <= minutes <= 59):
+                raise ValueError
+        except (TypeError, ValueError):
+            hours, minutes = 8, 0
 
         waypoints = []
         total_encounters = 0
@@ -241,7 +247,6 @@ class EncounterEngine:
             cumulative_time += segment_time_min
 
             # Calculate current time
-            hours, minutes = map(int, current_time.split(':'))
             new_time = datetime(2000, 1, 1, hours, minutes) + timedelta(minutes=cumulative_time)
             new_time_str = new_time.strftime("%H:%M")
 

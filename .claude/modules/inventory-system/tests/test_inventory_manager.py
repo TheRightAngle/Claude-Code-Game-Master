@@ -70,6 +70,22 @@ def test_remove_negative_quantity_is_rejected(fake_campaign):
     assert success is False
 
 
+def test_add_negative_quantity_is_rejected(fake_campaign):
+    manager = InventoryManager(fake_campaign["campaign_dir"])
+
+    success = manager.apply_transaction({"add": {"Bandage": -2}}, test_mode=True)
+
+    assert success is False
+
+
+def test_set_negative_quantity_is_rejected(fake_campaign):
+    manager = InventoryManager(fake_campaign["campaign_dir"])
+
+    success = manager.apply_transaction({"set": {"Bandage": -1}}, test_mode=True)
+
+    assert success is False
+
+
 def test_cli_rejects_character_name_mismatch(fake_campaign):
     result = _run_inventory_cli(fake_campaign["cwd"], "show", "Not Active Hero")
 

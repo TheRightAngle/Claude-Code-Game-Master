@@ -146,6 +146,8 @@ class FirearmsCombatResolver:
 
         if not targets:
             raise ValueError("At least one target is required")
+        if ammo_available < 0:
+            raise ValueError("ammo_available cannot be negative")
 
         max_rounds_per_round = self._calculate_rounds_per_dnd_round(weapon["rpm"])
         shots_fired = min(ammo_available, max_rounds_per_round)

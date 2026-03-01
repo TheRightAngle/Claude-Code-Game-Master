@@ -150,6 +150,16 @@ class InventoryManager:
             elif stackable[item] < quantity:
                 errors.append(f"Cannot remove {quantity}x {item} (only {stackable[item]} available)")
 
+        # Check additions
+        for item, quantity in operations.get('add', {}).items():
+            if quantity < 0:
+                errors.append(f"Cannot add a negative quantity for '{item}': {quantity}")
+
+        # Check set operations
+        for item, quantity in operations.get('set', {}).items():
+            if quantity < 0:
+                errors.append(f"Cannot set a negative quantity for '{item}': {quantity}")
+
         # Check unique removals
         for item in operations.get('remove_unique', []):
             inventory = self.character.get("inventory", {})

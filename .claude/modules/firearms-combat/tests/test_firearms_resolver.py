@@ -184,6 +184,16 @@ def test_full_auto_does_not_allocate_phantom_shots(fake_campaign):
     assert sum(t["shots"] for t in result["targets"]) == 2
 
 
+def test_full_auto_rejects_negative_ammo(fake_campaign):
+    """Negative ammo must be rejected before shot allocation."""
+    resolver = FirearmsCombatResolver(str(fake_campaign))
+
+    targets = [{"name": "Snork", "ac": 12, "hp": 15, "prot": 2}]
+
+    with pytest.raises(ValueError, match="negative"):
+        resolver.resolve_full_auto("AK-74", ammo_available=-1, targets=targets)
+
+
 def test_combat_output_formatting(fake_campaign):
     """Test combat result output formatting"""
     resolver = FirearmsCombatResolver(str(fake_campaign))
