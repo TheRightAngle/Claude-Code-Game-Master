@@ -434,6 +434,10 @@ class SurvivalEngine:
         if name is None:
             name = self._get_active_character_name()
 
+        # Respect requested character semantics in single-character mode too.
+        if not self.player_mgr.get_player(name):
+            raise RuntimeError(f"Character '{name}' not found")
+
         char = self.json_ops.load_json("character.json")
         cs = char.get('custom_stats', {}).get(stat)
         if cs is None:
@@ -480,11 +484,19 @@ class SurvivalEngine:
 
         auto_elapsed = 0
         if precise_time:
-            previous_time = campaign.get('time', {}).get('precise_time')
-            previous_date = campaign.get('time', {}).get('date')
+            time_block = campaign.get('time', {})
+            previous_time = campaign.get('precise_time') or time_block.get('precise_time')
+            previous_date = campaign.get('current_date') or campaign.get('date') or time_block.get('date')
             if previous_time and previous_date:
                 auto_elapsed = self._calculate_elapsed_hours(previous_time, precise_time, previous_date, date)
             elapsed_hours = auto_elapsed
+
+        # Keep canonical top-level fields in sync.
+        campaign['time_of_day'] = time_of_day
+        campaign['date'] = date
+        campaign['current_date'] = date
+        if precise_time:
+            campaign['precise_time'] = precise_time
 
         campaign.setdefault('time', {})
         campaign['time']['time_of_day'] = time_of_day

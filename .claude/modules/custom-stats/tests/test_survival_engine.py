@@ -105,12 +105,17 @@ def make_engine(ws_path):
         'tick': SurvivalEngine.tick,
         'status': SurvivalEngine.status,
         '_normalize_custom_stats': SurvivalEngine._normalize_custom_stats,
+        '_safe_eval_formula': staticmethod(SurvivalEngine._safe_eval_formula),
         '_apply_time_effects': SurvivalEngine._apply_time_effects,
         '_check_rule_condition': SurvivalEngine._check_rule_condition,
         '_check_stat_consequences': SurvivalEngine._check_stat_consequences,
         '_print_report': SurvivalEngine._print_report,
         '_get_active_character_name': SurvivalEngine._get_active_character_name,
         'modify_custom_stat': SurvivalEngine.modify_custom_stat,
+        'advance_time': SurvivalEngine.advance_time,
+        '_calculate_elapsed_hours': SurvivalEngine._calculate_elapsed_hours,
+        '_parse_elapsed_date': staticmethod(SurvivalEngine._parse_elapsed_date),
+        '_check_time_consequences': SurvivalEngine._check_time_consequences,
     })
 
     return engine
@@ -472,6 +477,23 @@ class TestEdgeCases:
 
 
 class TestFormulaSafety:
+    def test_formula_path_executes_when_per_hour_not_provided(self, tmp_path):
+        campaign = base_campaign(
+            {
+                "rules": [
+                    {"stat": "hunger", "per_hour_formula": "-1"},
+                ]
+            }
+        )
+        ws = make_campaign(tmp_path, campaign, base_character())
+        engine = make_engine(ws)
+
+        result = engine.tick(2)
+
+        hunger_change = next((c for c in result["stat_changes"] if c["stat"] == "hunger"), None)
+        assert hunger_change is not None
+        assert hunger_change["change"] == -2
+
     def test_malicious_formula_does_not_execute(self, tmp_path):
         marker = tmp_path / "formula-pwned.txt"
         payload = (
@@ -589,6 +611,40 @@ class TestPersistence:
 
         char = engine.player_mgr.get_player("TestHero")
         assert char["custom_stats"]["hunger"]["current"] == 75
+
+    def test_modify_custom_stat_respects_name_argument(self, tmp_path):
+        ws = make_campaign(tmp_path, base_campaign(), base_character())
+        engine = make_engine(ws)
+
+        with pytest.raises(RuntimeError, match="Character 'WrongHero' not found"):
+            engine.modify_custom_stat(name="WrongHero", stat="hunger", amount=-5)
+
+        char = engine.player_mgr.get_player("TestHero")
+        assert char["custom_stats"]["hunger"]["current"] == 80
+
+
+class TestAdvanceTime:
+    def test_advance_time_updates_top_level_and_nested_time_fields(self, tmp_path):
+        ws = make_campaign(tmp_path, base_campaign(), base_character())
+        engine = make_engine(ws)
+
+        ok = engine.advance_time(
+            time_of_day="Night",
+            date="Day 2",
+            elapsed_hours=0,
+            precise_time="23:15",
+        )
+
+        assert ok is True
+
+        campaign = engine.json_ops.load_json("campaign-overview.json")
+        assert campaign["time_of_day"] == "Night"
+        assert campaign["date"] == "Day 2"
+        assert campaign["current_date"] == "Day 2"
+        assert campaign["precise_time"] == "23:15"
+        assert campaign["time"]["time_of_day"] == "Night"
+        assert campaign["time"]["date"] == "Day 2"
+        assert campaign["time"]["precise_time"] == "23:15"
 
 
 if __name__ == "__main__":

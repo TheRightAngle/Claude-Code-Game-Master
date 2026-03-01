@@ -141,6 +141,13 @@ def test_get_character_modifier_skill(campaign_dir):
     assert modifier == 5  # character has stealth: 5
 
 
+def test_get_character_modifier_plain_stealth_uses_skill(campaign_dir):
+    """Plain 'stealth' config should use stealth skill, not abilities.stealth."""
+    engine = EncounterEngine(str(campaign_dir))
+    modifier = engine.get_character_modifier()
+    assert modifier == 5
+
+
 def test_get_character_modifier_custom_stat(campaign_dir):
     """Test character modifier from custom stat"""
     # Change config to use custom:awareness

@@ -113,6 +113,49 @@ def test_move_rejects_non_positive_speed_multiplier(monkeypatch, tmp_path, speed
     }
 
 
+@pytest.mark.parametrize("speed_kmh", [0, -2.0])
+def test_move_rejects_non_positive_effective_speed(monkeypatch, tmp_path, speed_kmh):
+    campaign_dir = tmp_path / "campaign"
+    campaign_dir.mkdir()
+
+    (campaign_dir / "campaign-overview.json").write_text(json.dumps({
+        "current_location": "Alpha",
+        "player_position": {"current_location": "Alpha"},
+    }))
+    (campaign_dir / "character.json").write_text(json.dumps({"speed_kmh": speed_kmh}))
+    (campaign_dir / "locations.json").write_text(json.dumps({
+        "Alpha": {
+            "position": "A",
+            "coordinates": {"x": 0, "y": 0},
+            "connections": [{"to": "Bravo", "distance_meters": 1000, "terrain": "open"}],
+        },
+        "Bravo": {
+            "position": "B",
+            "coordinates": {"x": 1000, "y": 0},
+            "connections": [],
+        },
+    }))
+
+    manager = NavigationManager(str(campaign_dir))
+
+    class FailSessionManager:
+        def move_party(self, location):
+            raise AssertionError("move_party should not be called for invalid effective speed")
+
+    def fail_run(*args, **kwargs):
+        raise AssertionError("subprocess.run should not be called for invalid effective speed")
+
+    monkeypatch.setattr("navigation_manager.SessionManager", FailSessionManager)
+    monkeypatch.setattr("subprocess.run", fail_run)
+
+    result = manager.move_with_navigation("Bravo")
+
+    assert result == {
+        "success": False,
+        "error": "effective speed_kmh must be greater than 0",
+    }
+
+
 def test_move_suppresses_session_stdout_when_emit_logs_false(monkeypatch, tmp_path, capsys):
     campaign_dir = tmp_path / "campaign"
     campaign_dir.mkdir()

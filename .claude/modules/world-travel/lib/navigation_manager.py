@@ -353,7 +353,10 @@ class NavigationManager:
             elapsed_hours = 0
         else:
             speed_kmh = character_data.get("speed_kmh", 4.0)
-            elapsed_hours = (distance_meters / 1000.0) / (speed_kmh * speed_multiplier)
+            effective_speed_kmh = speed_kmh * speed_multiplier
+            if effective_speed_kmh <= 0:
+                return {"success": False, "error": "effective speed_kmh must be greater than 0"}
+            elapsed_hours = (distance_meters / 1000.0) / effective_speed_kmh
 
         survival_stats_script = PROJECT_ROOT / ".claude" / "modules" / "custom-stats" / "tools" / "dm-survival.sh"
 

@@ -111,6 +111,11 @@ class EncounterEngine:
             skills = character.get('skills', {})
             return skills.get(skill_name, 0)
 
+        # Plain skill names (for example: "stealth") map to skills table.
+        skills = character.get('skills', {})
+        if stat_name in skills:
+            return skills.get(stat_name, 0)
+
         # If standard D&D stat
         abilities = character.get('abilities', {})
         stat_value = abilities.get(stat_name, 10)
