@@ -7,10 +7,17 @@ Example: uv run python dnd_monster.py goblin
 
 import sys
 import argparse
+import re
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from dnd_api_core import fetch, output, error_output
+
+
+def normalize_monster_index(name):
+    """Normalize user input to API monster index format."""
+    lowered = name.lower().replace("'", "").replace("’", "")
+    return re.sub(r"[^a-z0-9]+", "-", lowered).strip("-")
 
 def extract_combat_info(monster):
     """Extract just combat-relevant information"""
@@ -59,7 +66,7 @@ def main():
     args = parser.parse_args()
     
     # Convert monster name to index format
-    monster_index = args.monster.lower().replace(' ', '-')
+    monster_index = normalize_monster_index(args.monster)
     
     # Fetch monster data
     data = fetch(f"/monsters/{monster_index}")

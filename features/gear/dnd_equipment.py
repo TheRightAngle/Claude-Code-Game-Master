@@ -8,10 +8,17 @@ Example: uv run python dnd_equipment.py longsword
 
 import sys
 import argparse
+import re
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent / "dnd-api"))
 
 from dnd_api_core import fetch, output, error_output
+
+
+def normalize_equipment_index(name):
+    """Normalize user input to API equipment index format."""
+    lowered = name.lower().replace("'", "").replace("’", "")
+    return re.sub(r"[^a-z0-9]+", "-", lowered).strip("-")
 
 def extract_combat_info(equipment):
     """Extract just combat-relevant information"""
@@ -78,7 +85,7 @@ def main():
     args = parser.parse_args()
     
     # Convert equipment name to API format
-    equipment_index = args.equipment_name.lower().replace(' ', '-')
+    equipment_index = normalize_equipment_index(args.equipment_name)
     
     # Fetch equipment data
     data = fetch(f"/equipment/{equipment_index}")

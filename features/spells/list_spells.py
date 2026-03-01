@@ -150,11 +150,16 @@ def main():
     
     # Format output
     formatted = format_spell_list(spells)
+    use_grouped_results = (
+        bool(formatted)
+        and isinstance(formatted[0], dict)
+        and "level" in formatted[0]
+    )
     
     output({
         "count": len(spells),
         "total": total,
-        "results": formatted if isinstance(formatted[0], dict) and "level" in formatted[0] else spells
+        "results": formatted if use_grouped_results else spells
     })
 
 if __name__ == "__main__":

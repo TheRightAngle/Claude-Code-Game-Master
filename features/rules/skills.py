@@ -46,7 +46,13 @@ def list_all_skills():
     skills_by_ability = {}
     
     for skill in data.get("results", []):
-        ability = skill.get("ability_score", {}).get("name", "Unknown")
+        ability = skill.get("ability_score", {}).get("name")
+        if not ability and skill.get("index"):
+            details = fetch(f"/skills/{skill['index']}")
+            if "error" not in details:
+                ability = details.get("ability_score", {}).get("name")
+        ability = ability or "Unknown"
+
         if ability not in skills_by_ability:
             skills_by_ability[ability] = []
         

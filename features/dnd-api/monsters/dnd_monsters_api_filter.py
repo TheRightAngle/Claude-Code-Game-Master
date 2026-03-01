@@ -55,11 +55,13 @@ def fetch_monsters(
                     m for m in data["results"]
                     if search_lower in m["name"].lower()
                 ]
-                data["count"] = len(data["results"])
             
             # Apply limit if provided
-            if limit and "results" in data:
+            if limit is not None and "results" in data:
                 data["results"] = data["results"][:limit]
+
+            if "results" in data:
+                data["count"] = len(data["results"])
             
             return data
     except urllib.error.HTTPError as e:

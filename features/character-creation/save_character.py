@@ -35,11 +35,14 @@ def calculate_hp(class_name, level, con_modifier):
     # Level 1: max hit die + con modifier
     # Higher levels: average of hit die + con modifier per level
     if level == 1:
-        return hit_die + con_modifier
+        total_hp = hit_die + con_modifier
     else:
         base_hp = hit_die + con_modifier
         additional_hp = (level - 1) * ((hit_die // 2) + 1 + con_modifier)
-        return base_hp + additional_hp
+        total_hp = base_hp + additional_hp
+
+    # HP totals should never be zero or negative.
+    return max(1, total_hp)
 
 def calculate_saves(class_name, level, stats):
     """Calculate saving throw bonuses based on class proficiencies"""
@@ -98,13 +101,21 @@ def save_character(character_data):
         if field not in character_data:
             return {"error": f"Missing required field: {field}"}
 
+    if not isinstance(character_data['stats'], dict):
+        return {"error": "Field 'stats' must be an object/dictionary"}
+
     character_data['stats'] = normalize_stats(character_data['stats'])
+    required_stats = ['str', 'dex', 'con', 'int', 'wis', 'cha']
+    missing_stats = [stat for stat in required_stats if stat not in character_data['stats']]
+    if missing_stats:
+        return {"error": f"Missing required stats: {', '.join(missing_stats)}"}
 
     # Generate character ID
     char_id = create_character_id(character_data['name'])
 
     # Calculate derived values
     con_modifier = calculate_modifier(character_data['stats']['con'])
+    max_hp = calculate_hp(character_data['class'], character_data['level'], con_modifier)
 
     # Build complete character object
     character = {
@@ -114,8 +125,8 @@ def save_character(character_data):
         "class": character_data['class'],
         "level": character_data['level'],
         "hp": {
-            "current": calculate_hp(character_data['class'], character_data['level'], con_modifier),
-            "max": calculate_hp(character_data['class'], character_data['level'], con_modifier)
+            "current": max_hp,
+            "max": max_hp
         },
         "ac": character_data.get('ac', 10),  # Default AC, can be overridden
         "stats": character_data['stats'],

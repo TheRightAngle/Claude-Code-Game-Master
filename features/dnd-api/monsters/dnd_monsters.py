@@ -65,7 +65,7 @@ MONSTER_CR_TABLE = {
     "giant-eagle": 1, "giant-hyena": 1, "giant-octopus": 1, "giant-spider": 1, "giant-toad": 1,
     "giant-vulture": 1, "goblin-boss": 1, "half-ogre": 1, "harpy": 1, "hippogriff": 1,
     "imp": 1, "kuo-toa-whip": 1, "lion": 1, "quadrone": 1, "quaggoth-spore-servant": 1,
-    "quasit": 1, "scarecrow": 1, "specter": 1, "spy": 1, "stirge": 1, "stone-cursed": 1,
+    "quasit": 1, "scarecrow": 1, "specter": 1, "spy": 1, "stone-cursed": 1,
     "swarm-of-quippers": 1, "thri-kreen": 1, "tiger": 1, "yuan-ti-pureblood": 1,
     
     # CR 2
@@ -129,6 +129,13 @@ def filter_monsters_instant(monsters, args):
     """Apply filters using pre-built CR table"""
     results = []
     unknown_cr_monsters = []
+    cr_range = None
+    
+    if args.cr:
+        cr_range = parse_cr_range(args.cr)
+        if cr_range is None:
+            return []
+        cr_min, cr_max = cr_range
     
     for monster in monsters:
         # Name search first (fastest)
@@ -137,12 +144,7 @@ def filter_monsters_instant(monsters, args):
                 continue
         
         # CR filter using pre-built table
-        if args.cr:
-            cr_range = parse_cr_range(args.cr)
-            if cr_range is None:
-                continue
-            cr_min, cr_max = cr_range
-            
+        if cr_range is not None:
             # Check if we have this monster's CR
             monster_cr = MONSTER_CR_TABLE.get(monster['index'])
             
@@ -156,25 +158,20 @@ def filter_monsters_instant(monsters, args):
                 continue
             
             # Add CR to output
-            monster["cr"] = monster_cr
+            monster = {**monster, "cr": monster_cr}
         
         results.append(monster)
     
     # If we're filtering by CR and found unknown monsters, fetch their details
-    if args.cr and unknown_cr_monsters and len(unknown_cr_monsters) < 20:
-        # Only fetch if there are few unknowns
+    if cr_range is not None and unknown_cr_monsters:
         for monster in unknown_cr_monsters:
             details = fetch(f"/monsters/{monster['index']}")
             if "error" not in details:
                 monster_cr = details.get("challenge_rating", 0)
                 try:
                     monster_cr = float(monster_cr)
-                    cr_range = parse_cr_range(args.cr)
-                    if cr_range is not None:
-                        cr_min, cr_max = cr_range
-                        if cr_min <= monster_cr <= cr_max:
-                            monster["cr"] = monster_cr
-                            results.append(monster)
+                    if cr_min <= monster_cr <= cr_max:
+                        results.append({**monster, "cr": monster_cr})
                 except (ValueError, TypeError):
                     pass
     
