@@ -8,10 +8,20 @@ Example: uv run python dnd_magic_item.py "bag of holding"
 
 import sys
 import argparse
+import re
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent / "dnd-api"))
 
 from dnd_api_core import fetch, output, error_output
+
+
+def normalize_magic_item_index(name):
+    """Normalize user input to API magic item index format."""
+    lowered = name.lower().replace("'", "").replace("’", "")
+    normalized = re.sub(r"[^a-z0-9]+", "-", lowered).strip("-")
+    if not normalized:
+        raise ValueError("Magic item name must contain at least one letter or number")
+    return normalized
 
 def extract_summary_info(item):
     """Extract key magic item information"""
@@ -45,7 +55,10 @@ def main():
     args = parser.parse_args()
     
     # Convert item name to API format
-    item_index = args.item_name.lower().replace(' ', '-').replace("'", "").replace("’", "")
+    try:
+        item_index = normalize_magic_item_index(args.item_name)
+    except ValueError as exc:
+        error_output(str(exc))
     
     # Fetch magic item data
     data = fetch(f"/magic-items/{item_index}")

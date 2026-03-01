@@ -325,7 +325,66 @@ def test_save_character_rejects_non_numeric_stats_cleanly():
     )
 
     assert "error" in result
-    assert result["error"] == "Invalid stat value for 'con': expected a number"
+    assert result["error"] == "Invalid stat value for 'con': expected an integer"
+
+
+@pytest.mark.parametrize("bad_stat", [12.5, True, False])
+def test_save_character_rejects_non_integer_stat_values(bad_stat):
+    module = load_module("features/character-creation/save_character.py")
+
+    result = module.save_character(
+        {
+            "name": "Iria",
+            "race": "Elf",
+            "class": "Wizard",
+            "level": 1,
+            "stats": {"str": 8, "dex": 14, "con": bad_stat, "int": 16, "wis": 12, "cha": 10},
+        }
+    )
+
+    assert "error" in result
+    assert result["error"] == "Invalid stat value for 'con': expected an integer"
+
+
+def test_save_character_rejects_non_string_stat_keys():
+    module = load_module("features/character-creation/save_character.py")
+
+    result = module.save_character(
+        {
+            "name": "Iria",
+            "race": "Elf",
+            "class": "Wizard",
+            "level": 1,
+            "stats": {"str": 8, "dex": 14, "con": 12, "int": 16, "wis": 12, "cha": 10, 1: 9},
+        }
+    )
+
+    assert "error" in result
+    assert result["error"] == "Invalid stat key type: 1 (must be a string)"
+
+
+@pytest.mark.parametrize(
+    "stats",
+    [
+        {"str": 8, "dex": 14, "con": 12, "constitution": 13, "int": 16, "wis": 12, "cha": 10},
+        {"str": 8, "dex": 14, "constitution": 13, "con": 12, "int": 16, "wis": 12, "cha": 10},
+    ],
+)
+def test_save_character_rejects_conflicting_stat_alias_keys_deterministically(stats):
+    module = load_module("features/character-creation/save_character.py")
+
+    result = module.save_character(
+        {
+            "name": "Iria",
+            "race": "Elf",
+            "class": "Wizard",
+            "level": 1,
+            "stats": stats,
+        }
+    )
+
+    assert "error" in result
+    assert result["error"] == "Conflicting stat keys map to 'con': con, constitution"
 
 
 @pytest.mark.parametrize(
@@ -513,6 +572,30 @@ def test_get_spell_main_normalizes_smart_quotes_in_lookup(monkeypatch):
     assert endpoints[0] == "/api/2014/spells/melfs-acid-arrow"
 
 
+def test_spell_api_core_normalizes_slash_named_spells():
+    module = load_module("features/spells/spell_api_core.py")
+
+    assert module.format_spell_index("Blindness/Deafness") == "blindness-deafness"
+
+
+def test_spell_api_core_rejects_empty_normalized_spell_name():
+    module = load_module("features/spells/spell_api_core.py")
+
+    with pytest.raises(ValueError, match="must contain at least one letter or number"):
+        module.format_spell_index("!!!")
+
+
+def test_get_spell_main_rejects_empty_normalized_index_before_fetch(monkeypatch):
+    module = load_module("features/spells/get_spell.py")
+
+    monkeypatch.setattr(module, "fetch", lambda _endpoint: (_ for _ in ()).throw(AssertionError("must not fetch")))
+    monkeypatch.setattr(module, "error_output", lambda message: (_ for _ in ()).throw(RuntimeError(message)))
+    monkeypatch.setattr(module.sys, "argv", ["get_spell.py", "!!!"])
+
+    with pytest.raises(RuntimeError, match="must contain at least one letter or number"):
+        module.main()
+
+
 def test_dnd_magic_item_main_normalizes_smart_quotes_in_lookup(monkeypatch):
     module = load_module("features/gear/dnd_magic_item.py")
 
@@ -529,6 +612,35 @@ def test_dnd_magic_item_main_normalizes_smart_quotes_in_lookup(monkeypatch):
     module.main()
 
     assert endpoints[0] == "/magic-items/dragons-wrath-weapon"
+
+
+def test_dnd_magic_item_main_normalizes_parentheses_and_punctuation(monkeypatch):
+    module = load_module("features/gear/dnd_magic_item.py")
+
+    endpoints = []
+
+    def fake_fetch(endpoint):
+        endpoints.append(endpoint)
+        return {"name": "Any"}
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+    monkeypatch.setattr(module, "output", lambda _data: None)
+    monkeypatch.setattr(module.sys, "argv", ["dnd_magic_item.py", "Spell Scroll (1st)"])
+
+    module.main()
+
+    assert endpoints[0] == "/magic-items/spell-scroll-1st"
+
+
+def test_dnd_magic_item_main_rejects_empty_normalized_index_before_fetch(monkeypatch):
+    module = load_module("features/gear/dnd_magic_item.py")
+
+    monkeypatch.setattr(module, "fetch", lambda _endpoint: (_ for _ in ()).throw(AssertionError("must not fetch")))
+    monkeypatch.setattr(module, "error_output", lambda message: (_ for _ in ()).throw(RuntimeError(message)))
+    monkeypatch.setattr(module.sys, "argv", ["dnd_magic_item.py", "!!!"])
+
+    with pytest.raises(RuntimeError, match="must contain at least one letter or number"):
+        module.main()
 
 
 def test_filter_spells_applies_search_before_fetching_details(monkeypatch):
@@ -630,6 +742,27 @@ def test_get_class_details_preserves_all_proficiency_choice_groups():
     ]
 
 
+def test_get_class_details_uses_spellcasting_ability_for_primary_ability():
+    module = load_module("features/character-creation/api/get_class_details.py")
+
+    details = module.extract_class_details(
+        {
+            "name": "Wizard",
+            "spellcasting": {
+                "level": 1,
+                "spellcasting_ability": {"index": "int", "name": "INT"},
+            },
+            "saving_throws": [],
+            "proficiencies": [],
+            "subclasses": [],
+            "starting_equipment": [],
+        }
+    )
+
+    assert details["spellcasting"] is True
+    assert details["primary_ability"] == "INT"
+
+
 def test_dnd_monsters_cr_table_has_correct_red_dragon_wyrmling_cr():
     module = load_module("features/dnd-api/monsters/dnd_monsters.py")
     assert module.MONSTER_CR_TABLE["red-dragon-wyrmling"] == 4
@@ -640,6 +773,36 @@ def test_dnd_monsters_fractional_cr_range_parsing():
 
     assert module.parse_cr_range("1/2") == (0.5, 0.5)
     assert module.parse_cr_range("1/8-1/4") == (0.125, 0.25)
+
+
+def test_dnd_monsters_rejects_reversed_cr_range(monkeypatch):
+    module = load_module("features/dnd-api/monsters/dnd_monsters.py")
+
+    monkeypatch.setattr(
+        module,
+        "error_output",
+        lambda message: (_ for _ in ()).throw(RuntimeError(message)),
+    )
+
+    with pytest.raises(RuntimeError, match="minimum cannot be greater than maximum"):
+        module.parse_cr_range("5-1")
+
+
+def test_dnd_monsters_parse_cr_range_raises_when_error_output_does_not_exit(monkeypatch):
+    module = load_module("features/dnd-api/monsters/dnd_monsters.py")
+
+    monkeypatch.setattr(module, "error_output", lambda _message: None)
+
+    with pytest.raises(ValueError, match="Invalid CR range"):
+        module.parse_cr_range("oops-range")
+
+
+def test_dnd_monsters_source_has_no_duplicate_red_slaad_or_vampire_spawn_keys():
+    source_path = PROJECT_ROOT / "features/dnd-api/monsters/dnd_monsters.py"
+    source = source_path.read_text(encoding="utf-8")
+
+    assert source.count('"red-slaad"') == 1
+    assert source.count('"vampire-spawn"') == 1
 
 
 def test_dnd_monsters_filtered_total_reflects_matches_before_limit(monkeypatch):

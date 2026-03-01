@@ -91,7 +91,10 @@ def main():
     args = parser.parse_args()
     
     # Convert spell name to API format
-    spell_index = format_spell_index(args.spell_name)
+    try:
+        spell_index = format_spell_index(args.spell_name)
+    except ValueError as exc:
+        error_output(str(exc))
     
     # Fetch spell data
     data = fetch(f"/api/2014/spells/{spell_index}")

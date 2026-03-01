@@ -9,6 +9,7 @@ import sys
 import urllib.request
 import urllib.error
 import urllib.parse
+import re
 
 BASE_URL = "https://www.dnd5eapi.co"
 REQUEST_TIMEOUT = 10
@@ -50,6 +51,8 @@ def error_output(message):
 
 def format_spell_index(spell_name):
     """Convert spell name to API index format"""
-    # Convert to lowercase and replace spaces with hyphens
-    # Handle special cases like straight and smart apostrophes
-    return spell_name.lower().replace(" ", "-").replace("'", "").replace("’", "")
+    lowered = spell_name.lower().replace("'", "").replace("’", "")
+    normalized = re.sub(r"[^a-z0-9]+", "-", lowered).strip("-")
+    if not normalized:
+        raise ValueError("Spell name must contain at least one letter or number")
+    return normalized

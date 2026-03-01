@@ -9,7 +9,7 @@ import json
 import sys
 import os
 import re
-from numbers import Integral, Real
+from numbers import Integral
 from pathlib import Path
 
 # Add lib directory to path for imports
@@ -94,7 +94,30 @@ STAT_ALIASES = {
 
 def normalize_stats(stats: dict) -> dict:
     """Normalize stat keys to short form (constitution -> con, etc.)"""
-    return {STAT_ALIASES.get(k.lower(), k.lower()): v for k, v in stats.items()}
+    normalized = {}
+    normalized_key_sources = {}
+
+    for key, value in stats.items():
+        if not isinstance(key, str):
+            raise ValueError(f"Invalid stat key type: {key} (must be a string)")
+
+        key_lower = key.lower()
+        normalized_key = STAT_ALIASES.get(key_lower, key_lower)
+
+        if normalized_key in normalized_key_sources:
+            existing_source = normalized_key_sources[normalized_key]
+            if existing_source != key_lower:
+                conflicting_keys = sorted([existing_source, key_lower])
+                raise ValueError(
+                    f"Conflicting stat keys map to '{normalized_key}': "
+                    f"{conflicting_keys[0]}, {conflicting_keys[1]}"
+                )
+        else:
+            normalized_key_sources[normalized_key] = key_lower
+
+        normalized[normalized_key] = value
+
+    return normalized
 
 
 def save_character(character_data):
@@ -114,15 +137,18 @@ def save_character(character_data):
     if not isinstance(character_data['stats'], dict):
         return {"error": "Field 'stats' must be an object/dictionary"}
 
-    character_data['stats'] = normalize_stats(character_data['stats'])
+    try:
+        character_data['stats'] = normalize_stats(character_data['stats'])
+    except ValueError as exc:
+        return {"error": str(exc)}
     required_stats = ['str', 'dex', 'con', 'int', 'wis', 'cha']
     missing_stats = [stat for stat in required_stats if stat not in character_data['stats']]
     if missing_stats:
         return {"error": f"Missing required stats: {', '.join(missing_stats)}"}
     for stat in required_stats:
         value = character_data['stats'][stat]
-        if isinstance(value, bool) or not isinstance(value, Real):
-            return {"error": f"Invalid stat value for '{stat}': expected a number"}
+        if isinstance(value, bool) or not isinstance(value, Integral):
+            return {"error": f"Invalid stat value for '{stat}': expected an integer"}
 
     level = character_data.get('level')
     if isinstance(level, bool) or not isinstance(level, Integral) or level < 1:

@@ -91,13 +91,13 @@ MONSTER_CR_TABLE = {
     "gold-dragon-wyrmling": 3, "green-hag": 3, "hell-hound": 3, "hobgoblin-captain": 3,
     "hook-horror": 3, "killer-whale": 3, "knight": 3, "manticore": 3, "minotaur": 3,
     "mummy": 3, "neogi": 3, "nightmare": 3, "owlbear": 3, "phase-spider": 3, "quaggoth-thonot": 3,
-    "red-dragon-wyrmling": 4, "shadow-demon": 3, "spectator": 3, "vampire-spawn": 3,
+    "red-dragon-wyrmling": 4, "shadow-demon": 3, "spectator": 3,
     "water-weird": 3, "werewolf": 3, "wight": 3, "winter-wolf": 3, "yeti": 3,
     "yuan-ti-malison": 3,
     
     "banshee": 4, "black-pudding": 4, "bone-naga": 4, "chuul": 4, "couatl": 4, "elephant": 4,
     "ettin": 4, "flameskull": 4, "ghost": 4, "gnoll-fang-of-yeenoghu": 4, "helmed-horror": 4,
-    "incubus": 4, "lamia": 4, "lizard-king": 4, "orc-war-chief": 4, "red-slaad": 4,
+    "incubus": 4, "lamia": 4, "lizard-king": 4, "orc-war-chief": 4,
     "shadow-dragon": 4, "succubus": 4, "wereboar": 4, "weretiger": 4,
     
     "air-elemental": 5, "barbed-devil": 5, "barlgura": 5, "beholder-zombie": 5, "bulette": 5,
@@ -133,22 +133,33 @@ def parse_cr_value(cr_value):
     raise ValueError(f"Unsupported CR value: {cr_value}")
 
 
+def _fail_cr_parse(message):
+    error_output(message)
+    raise ValueError(message)
+
+
 def parse_cr_range(cr_str):
     """Parse CR input like '5' or '1-5' into min/max values"""
     if '-' in cr_str:
         parts = cr_str.split('-', 1)
-        if len(parts) == 2:
-            try:
-                return parse_cr_value(parts[0]), parse_cr_value(parts[1])
-            except ValueError:
-                error_output(f"Invalid CR range: {cr_str}")
-        error_output(f"Invalid CR range: {cr_str}")
+        if len(parts) != 2:
+            return _fail_cr_parse(f"Invalid CR range: {cr_str}")
+        try:
+            cr_min = parse_cr_value(parts[0])
+            cr_max = parse_cr_value(parts[1])
+        except ValueError:
+            return _fail_cr_parse(f"Invalid CR range: {cr_str}")
+        if cr_min > cr_max:
+            return _fail_cr_parse(
+                f"Invalid CR range: minimum cannot be greater than maximum ({cr_str})"
+            )
+        return cr_min, cr_max
     else:
         try:
             cr = parse_cr_value(cr_str)
             return cr, cr
         except ValueError:
-            error_output(f"Invalid CR value: {cr_str}")
+            return _fail_cr_parse(f"Invalid CR value: {cr_str}")
 
 def filter_monsters_instant(monsters, args):
     """Apply filters using pre-built CR table"""
