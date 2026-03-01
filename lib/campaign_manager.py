@@ -23,6 +23,36 @@ class CampaignManager:
         # Ensure directories exist
         self.campaigns_dir.mkdir(parents=True, exist_ok=True)
 
+    def _resolve_campaign_path(self, name: str, quiet: bool = False) -> Optional[Path]:
+        """Resolve campaign name to a safe path inside campaigns_dir."""
+        if not isinstance(name, str):
+            if not quiet:
+                print("[ERROR] Invalid campaign name")
+            return None
+
+        clean_name = name.strip()
+        if not clean_name:
+            if not quiet:
+                print("[ERROR] Campaign name cannot be empty")
+            return None
+
+        # Reject path-like names directly (prevents traversal and absolute paths)
+        if "/" in clean_name or "\\" in clean_name:
+            if not quiet:
+                print(f"[ERROR] Invalid campaign name: {name}")
+            return None
+
+        candidate = (self.campaigns_dir / clean_name).resolve()
+        campaigns_root = self.campaigns_dir.resolve()
+        try:
+            candidate.relative_to(campaigns_root)
+        except ValueError:
+            if not quiet:
+                print(f"[ERROR] Invalid campaign name: {name}")
+            return None
+
+        return candidate
+
     def list_campaigns(self) -> List[Dict[str, Any]]:
         """
         List all campaigns with their metadata
@@ -80,10 +110,9 @@ class CampaignManager:
 
         try:
             campaign_name = self.active_file.read_text().strip()
-            # Verify the campaign actually exists
-            campaign_path = self.campaigns_dir / campaign_name
-            if campaign_path.is_dir():
-                return campaign_name
+            campaign_path = self._resolve_campaign_path(campaign_name, quiet=True)
+            if campaign_path and campaign_path.is_dir():
+                return campaign_path.name
             return None
         except IOError:
             return None
@@ -93,14 +122,14 @@ class CampaignManager:
         Set the active campaign by name
         Returns True on success, False if campaign doesn't exist
         """
-        campaign_path = self.campaigns_dir / name
-        if not campaign_path.is_dir():
+        campaign_path = self._resolve_campaign_path(name)
+        if campaign_path is None or not campaign_path.is_dir():
             print(f"[ERROR] Campaign '{name}' does not exist")
             return False
 
         try:
-            self.active_file.write_text(name)
-            print(f"[SUCCESS] Active campaign set to: {name}")
+            self.active_file.write_text(campaign_path.name)
+            print(f"[SUCCESS] Active campaign set to: {campaign_path.name}")
             return True
         except IOError as e:
             print(f"[ERROR] Failed to set active campaign: {e}")
@@ -115,7 +144,9 @@ class CampaignManager:
         """
         # Normalize name for folder
         safe_name = name.lower().replace(' ', '-')
-        campaign_path = self.campaigns_dir / safe_name
+        campaign_path = self._resolve_campaign_path(safe_name)
+        if campaign_path is None:
+            return None
 
         if campaign_path.exists():
             print(f"[ERROR] Campaign '{safe_name}' already exists")
@@ -145,7 +176,9 @@ class CampaignManager:
         Requires confirm=True to actually delete
         Returns True on success
         """
-        campaign_path = self.campaigns_dir / name
+        campaign_path = self._resolve_campaign_path(name)
+        if campaign_path is None:
+            return False
 
         if not campaign_path.is_dir():
             print(f"[ERROR] Campaign '{name}' does not exist")
@@ -180,8 +213,8 @@ class CampaignManager:
             if name is None:
                 return None
 
-        campaign_path = self.campaigns_dir / name
-        if campaign_path.is_dir():
+        campaign_path = self._resolve_campaign_path(name)
+        if campaign_path and campaign_path.is_dir():
             return campaign_path
         return None
 
@@ -192,7 +225,7 @@ class CampaignManager:
         """
         active = self.get_active()
         if active:
-            return self.campaigns_dir / active
+            return self.get_campaign_path(active)
         return None
 
     def get_info(self, name: str = None) -> Optional[Dict[str, Any]]:

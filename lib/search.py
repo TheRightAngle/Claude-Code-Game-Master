@@ -23,8 +23,10 @@ class WorldSearcher:
         base_dir = world_state_dir or "world-state"
         campaign_mgr = CampaignManager(base_dir)
 
-        # Get the active campaign directory (falls back to legacy root)
+        # Require an active campaign for all search operations.
         active_dir = campaign_mgr.get_active_campaign_dir()
+        if active_dir is None:
+            raise RuntimeError("No active campaign. Run /new-game or /import first.")
         self.json_ops = JsonOperations(str(active_dir))
 
     def search_facts(self, query: str) -> Dict[str, List[Dict]]:

@@ -441,7 +441,8 @@ class AgentExtractor:
         # Save NPCs directly to extraction folder
         if npcs_dict:
             try:
-                extraction_json.save_json("npcs.json", npcs_dict)
+                if not extraction_json.save_json("npcs.json", npcs_dict):
+                    raise IOError("save_json returned False")
                 results['npcs_saved'] = len(merged_data.get('npcs', {}))
                 print(f"  Saved {results['npcs_saved']} NPCs to npcs.json")
             except Exception as e:
@@ -469,7 +470,8 @@ class AgentExtractor:
         # Save locations directly to extraction folder
         if locations_dict:
             try:
-                extraction_json.save_json("locations.json", locations_dict)
+                if not extraction_json.save_json("locations.json", locations_dict):
+                    raise IOError("save_json returned False")
                 results['locations_saved'] = len(merged_data.get('locations', {}))
                 print(f"  Saved {results['locations_saved']} locations to locations.json")
             except Exception as e:

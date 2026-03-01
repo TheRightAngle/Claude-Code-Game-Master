@@ -56,7 +56,8 @@ class World:
         self.campaign_mgr = CampaignManager()
 
         if campaign_name:
-            self.campaign_mgr.set_active(campaign_name)
+            if not self.campaign_mgr.set_active(campaign_name):
+                raise RuntimeError(f"Campaign '{campaign_name}' does not exist.")
 
         self.campaign_dir = self.campaign_mgr.get_active_campaign_dir()
 

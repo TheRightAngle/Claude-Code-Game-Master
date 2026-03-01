@@ -24,8 +24,10 @@ class WorldStats:
         base_dir = world_state_dir or "world-state"
         self.campaign_mgr = CampaignManager(base_dir)
 
-        # Get the active campaign directory (falls back to legacy root)
+        # Require active campaign context.
         self.world_state_dir = self.campaign_mgr.get_active_campaign_dir()
+        if self.world_state_dir is None:
+            raise RuntimeError("No active campaign. Run /new-game or /import first.")
         self.json_ops = JsonOperations(str(self.world_state_dir))
 
         # Character file (new format: single character.json)

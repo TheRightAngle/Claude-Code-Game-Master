@@ -94,6 +94,26 @@ class TestModifyHp:
         assert result["success"] is True
         assert result["current_hp"] == 17
 
+    def test_modify_hp_tolerates_malformed_hp_structure(self, tmp_path):
+        ws, camp = make_campaign(tmp_path, character={
+            "name": "Hero",
+            "level": 1,
+            "hp": "broken",
+            "gold": 0,
+            "xp": 0,
+            "equipment": [],
+        })
+        mgr = PlayerManager(ws)
+
+        result = mgr.modify_hp("Hero", 5)
+        assert result["success"] is True
+        assert result["current_hp"] == 0
+        assert result["max_hp"] == 0
+
+        char = json.loads((camp / "character.json").read_text())
+        assert isinstance(char["hp"], dict)
+        assert set(char["hp"].keys()) == {"current", "max"}
+
 
 class TestModifyGold:
     def test_add_gold(self, tmp_path):
@@ -186,6 +206,22 @@ class TestModifyInventory:
         mgr.modify_inventory("Hero", "add", "Magic Wand")
         char = json.loads((camp / "character.json").read_text())
         assert "Magic Wand" in char["equipment"]
+
+    def test_modify_inventory_tolerates_malformed_equipment_structure(self, tmp_path):
+        ws, camp = make_campaign(tmp_path, character={
+            "name": "Hero",
+            "level": 1,
+            "hp": {"current": 20, "max": 20},
+            "gold": 0,
+            "xp": 0,
+            "equipment": {"bad": "shape"},
+        })
+        mgr = PlayerManager(ws)
+
+        result = mgr.modify_inventory("Hero", "add", "Torch")
+        assert result["success"] is True
+        assert "Torch" in result["equipment"]
+        assert isinstance(result["equipment"], list)
 
 
 class TestModifyXp:

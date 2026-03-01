@@ -430,17 +430,28 @@ class SessionManager(EntityManager):
         lines.append("--- PENDING CONSEQUENCES ---")
         consequences = self.json_ops.load_json("consequences.json") or {}
         pending = []
-        if isinstance(consequences, dict):
+        if isinstance(consequences, dict) and isinstance(consequences.get('active'), list):
+            # Current schema: {"active": [...], "resolved": [...]}
+            for cdata in consequences.get('active', []):
+                if not isinstance(cdata, dict):
+                    continue
+                event = cdata.get('consequence', cdata.get('event', cdata.get('description', 'Unknown')))
+                trigger = cdata.get('trigger', 'Unknown')
+                cid = str(cdata.get('id', '?'))
+                short_id = cid[:4] if len(cid) >= 4 else cid
+                pending.append(f"[{short_id}] {event} -> triggers: {trigger}")
+        elif isinstance(consequences, dict):
+            # Legacy schema: keyed consequence dictionary
             for cid, cdata in consequences.items():
                 if isinstance(cdata, dict) and cdata.get('status', 'pending') == 'pending':
-                    event = cdata.get('event', cdata.get('description', 'Unknown'))
+                    event = cdata.get('consequence', cdata.get('event', cdata.get('description', 'Unknown')))
                     trigger = cdata.get('trigger', 'Unknown')
                     short_id = cid[:4] if len(cid) >= 4 else cid
                     pending.append(f"[{short_id}] {event} -> triggers: {trigger}")
         elif isinstance(consequences, list):
             for cdata in consequences:
                 if isinstance(cdata, dict) and cdata.get('status', 'pending') == 'pending':
-                    event = cdata.get('event', cdata.get('description', 'Unknown'))
+                    event = cdata.get('consequence', cdata.get('event', cdata.get('description', 'Unknown')))
                     trigger = cdata.get('trigger', 'Unknown')
                     cid = str(cdata.get('id', '?'))
                     short_id = cid[:4] if len(cid) >= 4 else cid
@@ -545,20 +556,41 @@ class SessionManager(EntityManager):
 
     def _find_save(self, name: str) -> Optional[Path]:
         """Find a save file by name or partial match"""
+        if not isinstance(name, str):
+            return None
+
+        query = name.strip()
+        if not query:
+            return None
+
+        # Disallow path-style names to prevent traversal outside saves_dir.
+        if "/" in query or "\\" in query:
+            return None
+
+        saves_root = self.saves_dir.resolve()
+
         # Try exact filename first
-        exact_match = self.saves_dir / name
-        if exact_match.exists():
-            return exact_match
+        exact_match = (self.saves_dir / query).resolve()
+        if exact_match.exists() and exact_match.is_file():
+            try:
+                exact_match.relative_to(saves_root)
+                return exact_match
+            except ValueError:
+                return None
 
         # Try with .json extension
-        if not name.endswith('.json'):
-            exact_match = self.saves_dir / f"{name}.json"
-            if exact_match.exists():
-                return exact_match
+        if not query.endswith('.json'):
+            exact_match = (self.saves_dir / f"{query}.json").resolve()
+            if exact_match.exists() and exact_match.is_file():
+                try:
+                    exact_match.relative_to(saves_root)
+                    return exact_match
+                except ValueError:
+                    return None
 
         # Try partial match
         for save_file in self.saves_dir.glob("*.json"):
-            if name.lower() in save_file.name.lower():
+            if query.lower() in save_file.name.lower():
                 return save_file
 
         return None

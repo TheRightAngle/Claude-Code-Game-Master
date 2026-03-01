@@ -131,6 +131,48 @@ class PlayerManager(EntityManager):
 
         return char
 
+    @staticmethod
+    def _safe_int(value: Any, default: int = 0) -> int:
+        """Best-effort integer coercion for legacy/malformed fields."""
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _normalize_hp(self, char: Dict[str, Any]) -> Dict[str, int]:
+        """Normalize HP structure to {'current': int, 'max': int}."""
+        hp = char.get('hp', {})
+        if not isinstance(hp, dict):
+            hp = {}
+
+        current_hp = self._safe_int(hp.get('current', 0), 0)
+        default_max = current_hp if current_hp > 0 else 0
+        max_hp = self._safe_int(hp.get('max', default_max), default_max)
+
+        current_hp = max(0, current_hp)
+        max_hp = max(0, max_hp)
+        if current_hp > max_hp:
+            current_hp = max_hp
+
+        normalized = {'current': current_hp, 'max': max_hp}
+        char['hp'] = normalized
+        return normalized
+
+    def _normalize_equipment(self, char: Dict[str, Any]) -> List[str]:
+        """Normalize equipment to a list for safe inventory mutations."""
+        equipment = char.get('equipment', [])
+        if isinstance(equipment, list):
+            normalized = [str(item) for item in equipment if item is not None]
+        elif isinstance(equipment, str):
+            normalized = [equipment] if equipment else []
+        elif equipment is None:
+            normalized = []
+        else:
+            normalized = [str(equipment)]
+
+        char['equipment'] = normalized
+        return normalized
+
     def get_player(self, name: Optional[str] = None) -> Optional[Dict]:
         """Get full player character data"""
         char = self._load_character(name)
@@ -320,9 +362,9 @@ class PlayerManager(EntityManager):
             print(f"[ERROR] Character '{name}' not found")
             return {'success': False}
 
-        hp = char.get('hp', {})
-        current_hp = hp.get('current', 0)
-        max_hp = hp.get('max', 0)
+        hp = self._normalize_hp(char)
+        current_hp = hp['current']
+        max_hp = hp['max']
 
         # Apply change and clamp between 0 and max
         new_hp = max(0, min(current_hp + amount, max_hp))
@@ -423,7 +465,7 @@ class PlayerManager(EntityManager):
             return {'success': False}
 
         char_name = char.get('name', name)
-        equipment = char.get('equipment', [])
+        equipment = self._normalize_equipment(char)
 
         if action == 'list':
             print(f"{char_name}'s Inventory:")
@@ -497,14 +539,16 @@ class PlayerManager(EntityManager):
             return {'success': False}
 
         char_name = char.get('name', name)
-        equipment = char.get('equipment', [])
+        equipment = self._normalize_equipment(char)
         current_gold = char.get('gold', 0)
         if not isinstance(current_gold, (int, float)):
             current_gold = 0
 
         # Add items
         for item in items:
-            equipment.append(item)
+            if item is None:
+                continue
+            equipment.append(str(item))
         char['equipment'] = equipment
 
         # Add gold

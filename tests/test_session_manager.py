@@ -122,6 +122,48 @@ class TestGetContext:
         assert "locations_count" in status
         assert "npcs_count" in status
 
+    def test_get_full_context_reads_pending_consequences_from_active_schema(self, tmp_path):
+        ws, camp = make_world_state(tmp_path)
+        (camp / "consequences.json").write_text(
+            json.dumps(
+                {
+                    "active": [
+                        {
+                            "id": "abcd1234",
+                            "consequence": "Storm cuts off the mountain pass",
+                            "trigger": "at dusk",
+                        }
+                    ],
+                    "resolved": [],
+                },
+                ensure_ascii=False,
+            )
+        )
+        mgr = SessionManager(ws)
+
+        ctx = mgr.get_full_context()
+        assert "Storm cuts off the mountain pass" in ctx
+        assert "at dusk" in ctx
+
+
+class TestSavePathTraversal:
+    def test_restore_save_rejects_traversal_name(self, tmp_path):
+        ws, camp = make_world_state(tmp_path)
+        outside_file = camp / "outside-save.json"
+        outside_file.write_text(json.dumps({"snapshot": {}}, ensure_ascii=False))
+
+        mgr = SessionManager(ws)
+        assert mgr.restore_save("../outside-save.json") is False
+
+    def test_delete_save_rejects_traversal_name(self, tmp_path):
+        ws, camp = make_world_state(tmp_path)
+        outside_file = camp / "outside-save.json"
+        outside_file.write_text(json.dumps({"snapshot": {}}, ensure_ascii=False))
+
+        mgr = SessionManager(ws)
+        assert mgr.delete_save("../outside-save.json") is False
+        assert outside_file.exists()
+
 
 class TestSessionStartEnd:
     def test_start_session_returns_summary(self, tmp_path):

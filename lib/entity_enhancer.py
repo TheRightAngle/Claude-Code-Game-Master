@@ -81,6 +81,8 @@ class EntityEnhancer:
 
         # Get active campaign directory
         self.campaign_dir = self.campaign_mgr.get_active_campaign_dir()
+        if self.campaign_dir is None:
+            raise RuntimeError("No active campaign. Run /new-game or /import first.")
         self.json_ops = JsonOperations(str(self.campaign_dir))
 
         # Lazy-load RAG components

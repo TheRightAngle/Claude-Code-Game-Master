@@ -656,9 +656,22 @@ class NPCManager(EntityManager):
                 continue
 
             tags = data.get('tags', {})
-            if filter_location and filter_location not in tags.get('locations', []):
+            if isinstance(tags, list):
+                # Legacy extracted format: untyped list of tags.
+                locations = [str(tag) for tag in tags]
+                quests = [str(tag) for tag in tags]
+            elif isinstance(tags, dict):
+                raw_locations = tags.get('locations', [])
+                raw_quests = tags.get('quests', [])
+                locations = raw_locations if isinstance(raw_locations, list) else []
+                quests = raw_quests if isinstance(raw_quests, list) else []
+            else:
+                locations = []
+                quests = []
+
+            if filter_location and filter_location not in locations:
                 continue
-            if filter_quest and filter_quest not in tags.get('quests', []):
+            if filter_quest and filter_quest not in quests:
                 continue
 
             filtered[name] = data
