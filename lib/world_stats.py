@@ -114,9 +114,16 @@ class WorldStats:
     def get_current_status(self) -> Dict[str, Any]:
         """Get current campaign status"""
         overview = self.json_ops.load_json("campaign-overview.json")
+        if not isinstance(overview, dict):
+            overview = {}
+
+        player_position = overview.get("player_position", {})
+        if not isinstance(player_position, dict):
+            player_position = {}
+
         return {
             "campaign_name": overview.get("campaign_name", "Unknown"),
-            "current_location": overview.get("player_position", {}).get("current_location"),
+            "current_location": player_position.get("current_location"),
             "time_of_day": overview.get("time_of_day", "Unknown"),
             "current_date": overview.get("current_date", "Unknown"),
             "active_character": overview.get("current_character")

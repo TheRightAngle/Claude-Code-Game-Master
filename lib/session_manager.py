@@ -410,12 +410,23 @@ class SessionManager(EntityManager):
         lines = []
 
         # --- Campaign header ---
-        campaign = self.json_ops.load_json(self.campaign_file) or {}
+        campaign = self.json_ops.load_json(self.campaign_file)
+        if not isinstance(campaign, dict):
+            campaign = {}
+
         campaign_name = campaign.get('name', campaign.get('campaign_name', 'Unknown Campaign'))
         session_num = self._get_session_number()
-        location = campaign.get('player_position', {}).get('current_location', 'Unknown')
-        time_of_day = campaign.get('time', {}).get('time_of_day', campaign.get('time_of_day', ''))
-        current_date = campaign.get('time', {}).get('current_date', campaign.get('current_date', ''))
+
+        player_position = campaign.get('player_position', {})
+        if not isinstance(player_position, dict):
+            player_position = {}
+        location = player_position.get('current_location', 'Unknown')
+
+        time_data = campaign.get('time', {})
+        if not isinstance(time_data, dict):
+            time_data = {}
+        time_of_day = time_data.get('time_of_day', campaign.get('time_of_day', ''))
+        current_date = time_data.get('current_date', campaign.get('current_date', ''))
         time_str = f"{time_of_day}, {current_date}" if time_of_day and current_date else time_of_day or current_date or 'Unknown'
 
         lines.append("=== SESSION CONTEXT ===")

@@ -75,3 +75,27 @@ def test_detailed_overview_ignores_malformed_entity_entries(tmp_path):
     assert overview["details"]["active_plots"] == [
         {"name": "Main Thread", "type": "main", "npcs": 1, "locations": 0}
     ]
+
+
+def test_get_current_status_handles_non_dict_player_position(tmp_path):
+    ws, camp = make_world_state(tmp_path)
+    (camp / "campaign-overview.json").write_text(
+        json.dumps(
+            {
+                "campaign_name": "Test Campaign",
+                "player_position": "invalid-shape",
+                "time_of_day": "Morning",
+                "current_date": "Day 1",
+            },
+            ensure_ascii=False,
+        )
+    )
+
+    stats = WorldStats(str(ws))
+
+    status = stats.get_current_status()
+
+    assert status["campaign_name"] == "Test Campaign"
+    assert status["current_location"] is None
+    assert status["time_of_day"] == "Morning"
+    assert status["current_date"] == "Day 1"

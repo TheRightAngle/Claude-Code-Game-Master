@@ -109,7 +109,7 @@ class WorldSearcher:
             if isinstance(tags, dict):
                 tag_list = tags.get(tag_key, [])
                 if isinstance(tag_list, list):
-                    if any(tag_lower in t.lower() for t in tag_list):
+                    if any(isinstance(t, str) and tag_lower in t.lower() for t in tag_list):
                         results[name] = npc_data
 
         return results
@@ -218,14 +218,20 @@ class WorldSearcher:
             # Check NPCs list
             if entity_type in ('any', 'npc'):
                 npcs = data.get('npcs', [])
-                if any(name_lower in npc.lower() for npc in npcs):
+                if isinstance(npcs, list) and any(
+                    isinstance(npc, str) and name_lower in npc.lower()
+                    for npc in npcs
+                ):
                     related[plot_name] = data
                     continue
 
             # Check locations list
             if entity_type in ('any', 'location'):
                 locations = data.get('locations', [])
-                if any(name_lower in loc.lower() for loc in locations):
+                if isinstance(locations, list) and any(
+                    isinstance(loc, str) and name_lower in loc.lower()
+                    for loc in locations
+                ):
                     related[plot_name] = data
                     continue
 
@@ -264,26 +270,45 @@ class WorldSearcher:
     def get_npc(self, name: str) -> Optional[Dict]:
         """Get specific NPC by exact name"""
         npcs = self.json_ops.load_json('npcs.json')
+        if not isinstance(npcs, dict):
+            return None
         return npcs.get(name)
 
     def get_location(self, name: str) -> Optional[Dict]:
         """Get specific location by exact name"""
         locations = self.json_ops.load_json('locations.json')
+        if not isinstance(locations, dict):
+            return None
         return locations.get(name)
 
     def get_pending_consequences(self, trigger: Optional[str] = None) -> List[Dict]:
         """Get pending consequences, optionally filtered by trigger"""
         consequences = self.json_ops.load_json('consequences.json')
+        if not isinstance(consequences, dict):
+            return []
+
         active = consequences.get('active', [])
+        if not isinstance(active, list):
+            return []
 
         if trigger:
-            return [c for c in active if trigger.lower() in c.get('trigger', '').lower()]
-        return active
+            trigger_lower = trigger.lower()
+            return [
+                c
+                for c in active
+                if isinstance(c, dict)
+                and isinstance(c.get('trigger', ''), str)
+                and trigger_lower in c.get('trigger', '').lower()
+            ]
+        return [c for c in active if isinstance(c, dict)]
 
     def get_facts_by_category(self, category: str) -> List[Dict]:
         """Get all facts in a specific category"""
         facts = self.json_ops.load_json('facts.json')
-        return facts.get(category, [])
+        if not isinstance(facts, dict):
+            return []
+        category_facts = facts.get(category, [])
+        return category_facts if isinstance(category_facts, list) else []
 
     def _format_text(self, text: str, full: bool = False, limit: int = 220) -> str:
         """Optionally truncate long text for token-efficient output."""

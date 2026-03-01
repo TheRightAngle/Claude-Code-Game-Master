@@ -175,6 +175,21 @@ class TestGetContext:
         assert "Storm cuts off the mountain pass" in ctx
         assert "at dusk" in ctx
 
+    def test_get_full_context_handles_non_dict_player_position_and_time(self, tmp_path):
+        ws, camp = make_world_state(
+            tmp_path,
+            overview_extra={
+                "player_position": ["invalid-shape"],
+                "time": "invalid-shape",
+            },
+        )
+        mgr = SessionManager(ws)
+
+        ctx = mgr.get_full_context()
+
+        assert "Test Campaign" in ctx
+        assert "Location: Unknown | Time: Day, Day 1" in ctx
+
 
 class TestSavePathTraversal:
     def test_create_save_sanitizes_slashes_in_name(self, tmp_path):

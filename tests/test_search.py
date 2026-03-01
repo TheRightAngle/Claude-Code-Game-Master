@@ -65,3 +65,72 @@ def test_search_facts_supports_string_fact_entries(tmp_path):
     results = searcher.search_facts("dragon")
 
     assert results == {"lore": [{"fact": "Ancient dragon sleeps beneath the hills"}]}
+
+
+def test_search_npcs_by_tag_ignores_non_string_tag_entries(tmp_path):
+    ws, camp = make_world_state(tmp_path)
+    (camp / "npcs.json").write_text(
+        json.dumps(
+            {
+                "Captain Rook": {
+                    "tags": {
+                        "locations": [None, 7, "Harbor Watch"],
+                    }
+                },
+                "Broken Tags": {
+                    "tags": {
+                        "locations": [None, 12],
+                    }
+                },
+            },
+            ensure_ascii=False,
+        )
+    )
+
+    searcher = WorldSearcher(str(ws))
+
+    results = searcher.search_npcs_by_tag("location", "harbor")
+
+    assert results == {
+        "Captain Rook": {
+            "tags": {
+                "locations": [None, 7, "Harbor Watch"],
+            }
+        }
+    }
+
+
+def test_find_related_plots_ignores_non_string_list_entries(tmp_path):
+    ws, camp = make_world_state(tmp_path)
+    (camp / "plots.json").write_text(
+        json.dumps(
+            {
+                "Roadside Ambush": {
+                    "npcs": [None, 1, "Captain Rook"],
+                    "locations": [{"name": "Forest Trail"}, "Harbor Road"],
+                }
+            },
+            ensure_ascii=False,
+        )
+    )
+
+    searcher = WorldSearcher(str(ws))
+
+    related = searcher.find_related_plots("rook", entity_type="npc")
+
+    assert "Roadside Ambush" in related
+
+
+def test_getters_handle_malformed_root_payloads(tmp_path):
+    ws, camp = make_world_state(tmp_path)
+    (camp / "npcs.json").write_text(json.dumps(["not-a-dict"], ensure_ascii=False))
+    (camp / "locations.json").write_text(json.dumps(["not-a-dict"], ensure_ascii=False))
+    (camp / "facts.json").write_text(json.dumps(["not-a-dict"], ensure_ascii=False))
+    (camp / "consequences.json").write_text(json.dumps(["not-a-dict"], ensure_ascii=False))
+
+    searcher = WorldSearcher(str(ws))
+
+    assert searcher.get_npc("Captain Rook") is None
+    assert searcher.get_location("Town") is None
+    assert searcher.get_pending_consequences() == []
+    assert searcher.get_facts_by_category("lore") == []
