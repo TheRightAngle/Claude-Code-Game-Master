@@ -76,7 +76,7 @@ def main():
         selected = random.sample(available, args.count)
     
     if args.quick:
-        # Just output the human-readable names.
+        # Output human-readable monster names.
         output({
             "cr": args.cr,
             "count": args.count,

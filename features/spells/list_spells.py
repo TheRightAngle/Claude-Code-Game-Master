@@ -35,7 +35,7 @@ def filter_spells(spells, args):
     )
     
     for spell in spells:
-        # Search filter is cheap and can avoid unnecessary detail fetches.
+        # Apply the inexpensive search filter before detail fetches.
         if args.search and args.search.lower() not in spell.get("name", "").lower():
             continue
 
