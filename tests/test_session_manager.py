@@ -1,5 +1,6 @@
 
 import json
+from pathlib import Path
 
 from lib.session_manager import SessionManager
 
@@ -202,6 +203,19 @@ class TestSavePathTraversal:
         assert "\\" not in filename
         assert (camp / "saves" / filename).exists()
 
+    def test_create_save_same_second_generates_unique_filenames(self, tmp_path, monkeypatch):
+        ws, camp = make_world_state(tmp_path)
+        mgr = SessionManager(ws)
+
+        monkeypatch.setattr(mgr, "get_iso_timestamp", lambda: "20260301-120000")
+
+        first = mgr.create_save("checkpoint")
+        second = mgr.create_save("checkpoint")
+
+        assert first != second
+        assert (camp / "saves" / first).exists()
+        assert (camp / "saves" / second).exists()
+
     def test_restore_save_rejects_traversal_name(self, tmp_path):
         ws, camp = make_world_state(tmp_path)
         outside_file = camp / "outside-save.json"
@@ -218,6 +232,83 @@ class TestSavePathTraversal:
         mgr = SessionManager(ws)
         assert mgr.delete_save("../outside-save.json") is False
         assert outside_file.exists()
+
+    def test_restore_save_partial_match_prefers_newest_timestamped_match(self, tmp_path, monkeypatch):
+        ws, camp = make_world_state(tmp_path)
+        mgr = SessionManager(ws)
+        saves_dir = camp / "saves"
+        saves_dir.mkdir(parents=True, exist_ok=True)
+
+        older = saves_dir / "20260301-120000-checkpoint.json"
+        newer = saves_dir / "20260301-120001-checkpoint.json"
+
+        older.write_text(
+            json.dumps(
+                {
+                    "snapshot": {
+                        "campaign_overview": {"campaign_name": "Older Save"},
+                    }
+                },
+                ensure_ascii=False,
+            )
+        )
+        newer.write_text(
+            json.dumps(
+                {
+                    "snapshot": {
+                        "campaign_overview": {"campaign_name": "Newer Save"},
+                    }
+                },
+                ensure_ascii=False,
+            )
+        )
+
+        original_glob = Path.glob
+
+        def ordered_glob(path_obj, pattern):
+            if path_obj == mgr.saves_dir and pattern == "*.json":
+                return [older, newer]
+            return original_glob(path_obj, pattern)
+
+        monkeypatch.setattr(Path, "glob", ordered_glob)
+
+        assert mgr.restore_save("checkpoint") is True
+        overview = json.loads((camp / "campaign-overview.json").read_text())
+        assert overview["campaign_name"] == "Newer Save"
+
+    def test_restore_save_partial_match_prefers_highest_numeric_suffix_for_same_timestamp(self, tmp_path):
+        ws, camp = make_world_state(tmp_path)
+        mgr = SessionManager(ws)
+        saves_dir = camp / "saves"
+        saves_dir.mkdir(parents=True, exist_ok=True)
+
+        suffix_9 = saves_dir / "20260301-120000-checkpoint-9.json"
+        suffix_10 = saves_dir / "20260301-120000-checkpoint-10.json"
+
+        suffix_9.write_text(
+            json.dumps(
+                {
+                    "snapshot": {
+                        "campaign_overview": {"campaign_name": "Suffix 9"},
+                    }
+                },
+                ensure_ascii=False,
+            )
+        )
+        suffix_10.write_text(
+            json.dumps(
+                {
+                    "snapshot": {
+                        "campaign_overview": {"campaign_name": "Suffix 10"},
+                    }
+                },
+                ensure_ascii=False,
+            )
+        )
+
+        assert mgr.restore_save("checkpoint") is True
+        overview = json.loads((camp / "campaign-overview.json").read_text())
+        assert overview["campaign_name"] == "Suffix 10"
 
     def test_restore_save_returns_false_when_snapshot_write_fails(self, tmp_path, monkeypatch):
         ws, camp = make_world_state(tmp_path)

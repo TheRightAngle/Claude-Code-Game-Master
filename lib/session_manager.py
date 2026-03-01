@@ -242,7 +242,12 @@ class SessionManager(EntityManager):
         # Normalize name
         safe_name = self._sanitize_save_name(name)
         timestamp = self.get_iso_timestamp()
-        filename = f"{timestamp}-{safe_name}.json"
+        base_filename = f"{timestamp}-{safe_name}"
+        filename = f"{base_filename}.json"
+        suffix = 2
+        while (self.saves_dir / filename).exists():
+            filename = f"{base_filename}-{suffix}.json"
+            suffix += 1
 
         # Gather all world state
         snapshot = {
@@ -766,9 +771,23 @@ class SessionManager(EntityManager):
                     return None
 
         # Try partial match
-        for save_file in self.saves_dir.glob("*.json"):
-            if query.lower() in save_file.name.lower():
-                return save_file
+        partial_matches = [
+            save_file
+            for save_file in self.saves_dir.glob("*.json")
+            if query.lower() in save_file.name.lower()
+        ]
+        if partial_matches:
+            def score(save_file: Path):
+                match = re.match(r"^(\d{8})-(\d{6})-", save_file.name)
+                if not match:
+                    return (0, "", 0, save_file.name.lower())
+                timestamp = f"{match.group(1)}{match.group(2)}"
+                stem_name = save_file.stem
+                suffix_match = re.search(r"-(\d+)$", stem_name)
+                suffix_num = int(suffix_match.group(1)) if suffix_match else 1
+                return (1, timestamp, suffix_num, save_file.name.lower())
+
+            return sorted(partial_matches, key=score, reverse=True)[0]
 
         return None
 

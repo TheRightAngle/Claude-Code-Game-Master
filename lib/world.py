@@ -65,15 +65,37 @@ class World:
             raise RuntimeError("No active campaign. Run /new-game or /import first.")
 
         self.json_ops = JsonOperations(str(self.campaign_dir))
+        self._campaign_name = self.campaign_dir.name
+        self._world_state_dir = str(self.campaign_dir.parent.parent)
 
-        # Initialize managers with shared campaign directory
-        # Each manager handles its own file operations within this directory
+        # Lazy-loaded manager instances pinned to this world's campaign.
         self._npcs = None
         self._locations = None
         self._plots = None
         self._session = None
         self._consequences = None
         self._player = None
+
+    def _create_pinned_manager(self, manager_cls):
+        """Create manager bound to this world's campaign, restoring global active campaign afterwards."""
+        previous_active = self.campaign_mgr.get_active()
+        switched = previous_active != self._campaign_name
+
+        if switched and not self.campaign_mgr.set_active(self._campaign_name):
+            raise RuntimeError(
+                f"Failed to set active campaign to pinned campaign '{self._campaign_name}'"
+            )
+
+        try:
+            manager = manager_cls(self._world_state_dir)
+        finally:
+            if switched and previous_active and not self.campaign_mgr.set_active(previous_active):
+                raise RuntimeError(
+                    f"Failed to restore active campaign '{previous_active}' "
+                    f"after creating manager for '{self._campaign_name}'"
+                )
+
+        return manager
 
     # Lazy-loaded manager properties
     # This avoids loading all managers when only one is needed
@@ -82,42 +104,42 @@ class World:
     def npcs(self) -> NPCManager:
         """NPC manager for creating and updating NPCs."""
         if self._npcs is None:
-            self._npcs = NPCManager(str(self.campaign_dir.parent.parent))
+            self._npcs = self._create_pinned_manager(NPCManager)
         return self._npcs
 
     @property
     def locations(self) -> LocationManager:
         """Location manager for world geography."""
         if self._locations is None:
-            self._locations = LocationManager(str(self.campaign_dir.parent.parent))
+            self._locations = self._create_pinned_manager(LocationManager)
         return self._locations
 
     @property
     def plots(self) -> PlotManager:
         """Plot manager for quests and storylines."""
         if self._plots is None:
-            self._plots = PlotManager(str(self.campaign_dir.parent.parent))
+            self._plots = self._create_pinned_manager(PlotManager)
         return self._plots
 
     @property
     def session(self) -> SessionManager:
         """Session manager for game state and saves."""
         if self._session is None:
-            self._session = SessionManager(str(self.campaign_dir.parent.parent))
+            self._session = self._create_pinned_manager(SessionManager)
         return self._session
 
     @property
     def consequences(self) -> ConsequenceManager:
         """Consequence manager for tracking future events."""
         if self._consequences is None:
-            self._consequences = ConsequenceManager(str(self.campaign_dir.parent.parent))
+            self._consequences = self._create_pinned_manager(ConsequenceManager)
         return self._consequences
 
     @property
     def player(self) -> PlayerManager:
         """Player manager for character stats."""
         if self._player is None:
-            self._player = PlayerManager(str(self.campaign_dir.parent.parent))
+            self._player = self._create_pinned_manager(PlayerManager)
         return self._player
 
     # Convenience properties for common data
@@ -125,24 +147,33 @@ class World:
     @property
     def campaign_name(self) -> Optional[str]:
         """Get the name of the active campaign."""
-        return self.campaign_mgr.get_active()
+        return self._campaign_name
 
     @property
     def current_location(self) -> Optional[str]:
         """Get the party's current location."""
         overview = self.json_ops.load_json("campaign-overview.json")
-        return overview.get("player_position", {}).get("current_location")
+        if not isinstance(overview, dict):
+            return None
+        player_position = overview.get("player_position", {})
+        if not isinstance(player_position, dict):
+            return None
+        return player_position.get("current_location")
 
     @property
     def time_of_day(self) -> Optional[str]:
         """Get the current time of day."""
         overview = self.json_ops.load_json("campaign-overview.json")
+        if not isinstance(overview, dict):
+            return None
         return overview.get("time_of_day")
 
     @property
     def current_date(self) -> Optional[str]:
         """Get the current in-game date."""
         overview = self.json_ops.load_json("campaign-overview.json")
+        if not isinstance(overview, dict):
+            return None
         return overview.get("current_date")
 
     @property
@@ -187,16 +218,28 @@ class World:
         Returns:
             Dict with counts and current state info
         """
+        npcs = self.json_ops.load_json("npcs.json")
+        locations = self.json_ops.load_json("locations.json")
+        consequences = self.json_ops.load_json("consequences.json")
+
+        if isinstance(consequences, dict):
+            active_consequences = consequences.get("active", [])
+        elif isinstance(consequences, list):
+            active_consequences = consequences
+        else:
+            active_consequences = []
+
+        if not isinstance(active_consequences, list):
+            active_consequences = []
+
         return {
             "campaign": self.campaign_name,
             "location": self.current_location,
             "time": self.time_of_day,
             "date": self.current_date,
-            "npcs_count": len(self.json_ops.load_json("npcs.json") or {}),
-            "locations_count": len(self.json_ops.load_json("locations.json") or {}),
-            "active_consequences": len(
-                (self.json_ops.load_json("consequences.json") or {}).get("active", [])
-            ),
+            "npcs_count": len(npcs) if isinstance(npcs, (dict, list)) else 0,
+            "locations_count": len(locations) if isinstance(locations, (dict, list)) else 0,
+            "active_consequences": len(active_consequences),
         }
 
     def save_all(self):
