@@ -47,17 +47,26 @@ if [ -z "$HOURS_VAL" ]; then
     exit 1
 fi
 
+if ! [[ "$HOURS_VAL" =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
+    echo "[ERROR] --hours must be numeric" >&2
+    exit 1
+fi
+
 cd "$PROJECT_ROOT"
-uv run python - <<PYEOF
+DM_CONSEQUENCE_DESC="$DESC" \
+DM_CONSEQUENCE_TRIGGER="$TRIGGER" \
+DM_CONSEQUENCE_HOURS="$HOURS_VAL" \
+uv run python - <<'PYEOF'
+import os
 import sys, uuid, json
 from pathlib import Path
 
 sys.path.insert(0, str(Path("lib")))
 from json_ops import JsonOperations
 
-desc = """$DESC"""
-trigger = """$TRIGGER"""
-hours = float("$HOURS_VAL")
+desc = os.environ["DM_CONSEQUENCE_DESC"]
+trigger = os.environ["DM_CONSEQUENCE_TRIGGER"]
+hours = float(os.environ["DM_CONSEQUENCE_HOURS"])
 
 json_ops = JsonOperations()
 data = json_ops.load_json("consequences.json")

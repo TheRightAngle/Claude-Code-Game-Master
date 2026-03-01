@@ -62,6 +62,7 @@ preview_world() {
 
 reset_world() {
     require_active_campaign
+    local legacy_characters_dir="${CHARACTERS_DIR:-$WORLD_STATE_DIR/characters}"
     echo "🧹 Resetting world state..."
     echo ""
 
@@ -118,8 +119,8 @@ EOF
     if [ -f "$CHARACTER_FILE" ]; then
         rm -f "$CHARACTER_FILE"
         echo "  ✓ Character removed"
-    elif [ -d "$CHARACTERS_DIR" ]; then
-        rm -f "$CHARACTERS_DIR"/*.json 2>/dev/null
+    elif [ -d "$legacy_characters_dir" ]; then
+        find "$legacy_characters_dir" -maxdepth 1 -type f -name '*.json' -delete
         echo "  ✓ Characters removed"
     fi
 

@@ -81,6 +81,7 @@ if [ -n "$WORLD_STATE_DIR" ]; then
     SESSION_LOG="$WORLD_STATE_DIR/session-log.md"
     CAMPAIGN_OVERVIEW="$WORLD_STATE_DIR/campaign-overview.json"
     CHARACTER_FILE="$WORLD_STATE_DIR/character.json"
+    CHARACTERS_DIR="$WORLD_STATE_DIR/characters"
 else
     # No active campaign - set empty paths (tools should check and error)
     NPCS_FILE=""
@@ -90,6 +91,7 @@ else
     SESSION_LOG=""
     CAMPAIGN_OVERVIEW=""
     CHARACTER_FILE=""
+    CHARACTERS_DIR=""
 fi
 
 # Helper to check if campaign is active and exit with error if not
@@ -204,9 +206,58 @@ check_env() {
     return 0
 }
 
-# Load .env file if it exists
-if [ -f "$PROJECT_ROOT/.env" ]; then
-    set -a
-    source "$PROJECT_ROOT/.env"
-    set +a
-fi
+# Trim leading and trailing whitespace.
+trim_whitespace() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+
+# Safely parse a .env file without executing code.
+load_dotenv_file() {
+    local env_file="$1"
+    [ -f "$env_file" ] || return 0
+
+    local line key value
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%$'\r'}"
+        line="$(trim_whitespace "$line")"
+        [ -z "$line" ] && continue
+        [[ "$line" == \#* ]] && continue
+
+        if [[ "$line" == export[[:space:]]* ]]; then
+            line="${line#export}"
+            line="$(trim_whitespace "$line")"
+        fi
+
+        if [[ "$line" != *=* ]]; then
+            warning "Skipping malformed .env line: $line"
+            continue
+        fi
+
+        key="${line%%=*}"
+        value="${line#*=}"
+        key="$(trim_whitespace "$key")"
+        value="$(trim_whitespace "$value")"
+
+        if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+            warning "Skipping invalid .env key: $key"
+            continue
+        fi
+
+        if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+            value="${value:1:${#value}-2}"
+        elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+            value="${value:1:${#value}-2}"
+        else
+            value="${value%%[[:space:]]#*}"
+            value="$(trim_whitespace "$value")"
+        fi
+
+        printf -v "$key" '%s' "$value"
+        export "$key"
+    done < "$env_file"
+}
+
+load_dotenv_file "$PROJECT_ROOT/.env"

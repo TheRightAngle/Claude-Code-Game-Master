@@ -220,22 +220,53 @@ review_content() {
 
 clean_temp() {
     local campaign_name="$1"
+    local campaign_real campaigns_real extract_real world_real
 
     if [ -n "$campaign_name" ]; then
         echo "Cleaning campaign extraction directory: $campaign_name"
         CAMPAIGN_DIR="$CAMPAIGNS_DIR/$(echo "$campaign_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')"
 
         if [ -d "$CAMPAIGN_DIR" ]; then
-            rm -rf "$CAMPAIGN_DIR"
-            echo "Cleaned: $CAMPAIGN_DIR"
+            campaign_real=$(cd "$CAMPAIGN_DIR" && pwd -P)
+            campaigns_real=$(cd "$CAMPAIGNS_DIR" && pwd -P)
+
+            case "$campaign_real" in
+                ""|"/"|"$campaigns_real")
+                    echo "Error: Refusing unsafe cleanup target: $CAMPAIGN_DIR"
+                    exit 1
+                    ;;
+                "$campaigns_real"/*)
+                    rm -rf -- "$campaign_real"
+                    echo "Cleaned: $campaign_real"
+                    ;;
+                *)
+                    echo "Error: Refusing cleanup outside campaigns directory: $campaign_real"
+                    exit 1
+                    ;;
+            esac
         else
             echo "Campaign directory not found: $CAMPAIGN_DIR"
         fi
     else
         echo "Cleaning default extraction temp directory..."
         if [ -d "$EXTRACT_DIR" ]; then
-            rm -rf "$EXTRACT_DIR"/*
-            echo "Cleaned: $EXTRACT_DIR"
+            extract_real=$(cd "$EXTRACT_DIR" && pwd -P)
+            world_real=$(cd "$WORLD_STATE_BASE" && pwd -P)
+
+            case "$extract_real" in
+                ""|"/"|"$world_real")
+                    echo "Error: Refusing unsafe extraction cleanup target: $EXTRACT_DIR"
+                    exit 1
+                    ;;
+                "$world_real"/*)
+                    find "$extract_real" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+                    echo "Cleaned: $extract_real"
+                    ;;
+                *)
+                    echo "Error: Refusing cleanup outside world-state: $extract_real"
+                    exit 1
+                    ;;
+            esac
         fi
     fi
 

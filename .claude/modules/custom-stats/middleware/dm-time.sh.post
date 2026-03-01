@@ -5,17 +5,27 @@
 MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 ELAPSED=""
-SLEEPING=""
-i=1
-for arg in "$@"; do
-    if [ "$arg" = "--elapsed" ]; then
-        eval "ELAPSED=\${$((i+1)):-}"
-    elif [ "$arg" = "--sleeping" ]; then
-        SLEEPING="--sleeping"
-    fi
-    i=$((i+1))
+SLEEPING=false
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --elapsed)
+            ELAPSED="${2:-}"
+            shift 2
+            ;;
+        --sleeping)
+            SLEEPING=true
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
 done
 
 [ -n "$ELAPSED" ] || exit 0
 
-bash "$MODULE_DIR/tools/dm-survival.sh" tick --elapsed "$ELAPSED" $SLEEPING
+if [ "$SLEEPING" = true ]; then
+    bash "$MODULE_DIR/tools/dm-survival.sh" tick --elapsed "$ELAPSED" --sleeping
+else
+    bash "$MODULE_DIR/tools/dm-survival.sh" tick --elapsed "$ELAPSED"
+fi
