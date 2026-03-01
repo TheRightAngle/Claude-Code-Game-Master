@@ -32,20 +32,35 @@ class WorldSearcher:
     def search_facts(self, query: str) -> Dict[str, List[Dict]]:
         """Search facts by category or content"""
         facts = self.json_ops.load_json('facts.json')
+        if not isinstance(facts, dict):
+            return {}
+
         results = {}
         query_lower = query.lower()
+
+        def normalize_fact(fact: Any) -> Optional[Dict[str, Any]]:
+            if isinstance(fact, dict):
+                return fact
+            if isinstance(fact, str):
+                return {"fact": fact}
+            return None
 
         for category, fact_list in facts.items():
             if not isinstance(fact_list, list):
                 continue
+
+            normalized = [f for f in (normalize_fact(item) for item in fact_list) if f is not None]
+            if not normalized:
+                continue
+
             # Check category name
             if query_lower in category.lower():
-                results[category] = fact_list
+                results[category] = normalized
             else:
                 # Check fact content
                 matching_facts = [
-                    fact for fact in fact_list
-                    if isinstance(fact, dict) and query_lower in fact.get('fact', '').lower()
+                    fact for fact in normalized
+                    if isinstance(fact.get('fact', ''), str) and query_lower in fact.get('fact', '').lower()
                 ]
                 if matching_facts:
                     results[category] = matching_facts
@@ -55,6 +70,9 @@ class WorldSearcher:
     def search_npcs(self, query: str) -> Dict[str, Dict]:
         """Search NPCs by name or description"""
         npcs = self.json_ops.load_json('npcs.json')
+        if not isinstance(npcs, dict):
+            return {}
+
         results = {}
         query_lower = query.lower()
 
@@ -70,6 +88,9 @@ class WorldSearcher:
     def search_npcs_by_tag(self, tag_type: str, tag_value: str) -> Dict[str, Dict]:
         """Search NPCs by location or quest tag"""
         npcs = self.json_ops.load_json('npcs.json')
+        if not isinstance(npcs, dict):
+            return {}
+
         results = {}
         tag_lower = tag_value.lower()
 
@@ -96,6 +117,9 @@ class WorldSearcher:
     def search_locations(self, query: str) -> Dict[str, Dict]:
         """Search locations by name, description, or position"""
         locations = self.json_ops.load_json('locations.json')
+        if not isinstance(locations, dict):
+            return {}
+
         results = {}
         query_lower = query.lower()
 
@@ -112,6 +136,9 @@ class WorldSearcher:
     def search_consequences(self, query: str) -> List[Dict]:
         """Search active consequences"""
         consequences = self.json_ops.load_json('consequences.json')
+        if not isinstance(consequences, dict):
+            return []
+
         results = []
         query_lower = query.lower()
 
@@ -125,6 +152,9 @@ class WorldSearcher:
     def search_plots(self, query: str) -> Dict[str, Dict]:
         """Search plots by name, description, NPCs, locations, or objectives"""
         plots = self.json_ops.load_json('plots.json')
+        if not isinstance(plots, dict):
+            return {}
+
         results = {}
         query_lower = query.lower()
 
@@ -175,6 +205,9 @@ class WorldSearcher:
         Used for cross-referencing when searching NPCs/locations.
         """
         plots = self.json_ops.load_json('plots.json')
+        if not isinstance(plots, dict):
+            return {}
+
         related = {}
         name_lower = entity_name.lower()
 

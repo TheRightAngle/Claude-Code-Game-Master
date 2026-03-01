@@ -48,6 +48,12 @@ COMMAND="$1"
 shift
 
 case "$COMMAND" in
+    find|query|apply|summary|list-unenhanced|list|dungeon-check|scene|batch)
+        require_active_campaign
+        ;;
+esac
+
+case "$COMMAND" in
     find)
         if [ $# -lt 1 ]; then
             echo "Usage: dm-enhance.sh find <name>"

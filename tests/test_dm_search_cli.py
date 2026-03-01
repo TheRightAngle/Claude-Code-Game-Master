@@ -30,3 +30,51 @@ def test_dm_search_rejects_world_only_and_rag_only_together(tmp_path: Path) -> N
 
     assert result.returncode != 0
     assert "--world-only and --rag-only cannot be used together" in result.stderr
+
+
+def test_dm_search_rejects_missing_value_for_n_option(tmp_path: Path) -> None:
+    project_root, search_script = _prepare_isolated_search_cli(tmp_path)
+
+    result = subprocess.run(
+        ["bash", str(search_script), "dragon", "-n"],
+        cwd=project_root,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=1,
+    )
+
+    assert result.returncode != 0
+    assert "Missing value for -n" in result.stderr
+
+
+def test_dm_search_rejects_missing_value_for_tag_location_option(tmp_path: Path) -> None:
+    project_root, search_script = _prepare_isolated_search_cli(tmp_path)
+
+    result = subprocess.run(
+        ["bash", str(search_script), "--tag-location"],
+        cwd=project_root,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=1,
+    )
+
+    assert result.returncode != 0
+    assert "Missing value for --tag-location" in result.stderr
+
+
+def test_dm_search_rejects_missing_value_for_tag_quest_option(tmp_path: Path) -> None:
+    project_root, search_script = _prepare_isolated_search_cli(tmp_path)
+
+    result = subprocess.run(
+        ["bash", str(search_script), "--tag-quest"],
+        cwd=project_root,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=1,
+    )
+
+    assert result.returncode != 0
+    assert "Missing value for --tag-quest" in result.stderr

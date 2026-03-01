@@ -464,7 +464,7 @@ class NPCManager(EntityManager):
                 # Strip whitespace and convert
                 cleaned = str(val).strip()
                 return int(cleaned)
-            except ValueError:
+            except (TypeError, ValueError):
                 print(f"[ERROR] Invalid integer value for {field_name}: '{val}'")
                 return None
 
@@ -472,10 +472,23 @@ class NPCManager(EntityManager):
             parsed = parse_int(value, 'hp_max')
             if parsed is None:
                 return False
-            sheet['hp']['max'] = parsed
+
+            hp = sheet.get('hp')
+            if not isinstance(hp, dict):
+                print(f"[ERROR] {name} has malformed hp data")
+                return False
+
+            current_hp = parse_int(hp.get('current'), 'hp.current')
+            max_hp = parse_int(hp.get('max'), 'hp.max')
+            if current_hp is None or max_hp is None:
+                return False
+
+            hp['current'] = current_hp
+            hp['max'] = parsed
             # Also heal to new max if current > new max
-            if sheet['hp']['current'] > sheet['hp']['max']:
-                sheet['hp']['current'] = sheet['hp']['max']
+            if hp['current'] > hp['max']:
+                hp['current'] = hp['max']
+            sheet['hp'] = hp
         elif field == 'attack':
             parsed = parse_int(value, 'attack')
             if parsed is None:

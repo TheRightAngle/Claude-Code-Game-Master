@@ -40,6 +40,11 @@ TAG_SEARCH=false
 TAG_TYPE=""
 TAG_VALUE=""
 
+missing_option_value() {
+    error "Missing value for $1"
+    exit 1
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --rag)
@@ -58,16 +63,25 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -n)
+            if [ $# -lt 2 ] || [[ "$2" == -* ]]; then
+                missing_option_value "-n"
+            fi
             RAG_COUNT="$2"
             shift 2
             ;;
         --tag-location)
+            if [ $# -lt 2 ] || [[ "$2" == -* ]]; then
+                missing_option_value "--tag-location"
+            fi
             TAG_SEARCH=true
             TAG_TYPE="--tag-location"
             TAG_VALUE="$2"
             shift 2
             ;;
         --tag-quest)
+            if [ $# -lt 2 ] || [[ "$2" == -* ]]; then
+                missing_option_value "--tag-quest"
+            fi
             TAG_SEARCH=true
             TAG_TYPE="--tag-quest"
             TAG_VALUE="$2"

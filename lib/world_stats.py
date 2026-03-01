@@ -140,27 +140,34 @@ class WorldStats:
 
         # NPCs (first 10)
         npcs = self.json_ops.load_json("npcs.json")
-        if npcs:
+        if isinstance(npcs, dict) and npcs:
             details["npcs"] = [
                 {"name": name, "attitude": data.get("attitude", "unknown")}
                 for name, data in sorted(npcs.items())[:10]
+                if isinstance(data, dict)
             ]
             details["npcs_total"] = len(npcs)
 
         # Locations (first 10)
         locations = self.json_ops.load_json("locations.json")
-        if locations:
+        if isinstance(locations, dict) and locations:
             details["locations"] = [
-                {"name": name, "connections": len(data.get("connections", []))}
+                {
+                    "name": name,
+                    "connections": len(data.get("connections", []))
+                    if isinstance(data.get("connections", []), list) else 0
+                }
                 for name, data in sorted(locations.items())[:10]
+                if isinstance(data, dict)
             ]
             details["locations_total"] = len(locations)
 
         # Facts by category
         facts = self.json_ops.load_json("facts.json")
-        if facts:
+        if isinstance(facts, dict) and facts:
             details["fact_categories"] = {
-                cat: len(items) for cat, items in sorted(facts.items())[:5]
+                cat: len(items) if isinstance(items, list) else 0
+                for cat, items in sorted(facts.items())[:5]
             }
 
         # Active consequences (first 3)
@@ -174,15 +181,17 @@ class WorldStats:
 
         # Active plots (first 5)
         plots = self.json_ops.load_json("plots.json")
-        if plots:
+        if isinstance(plots, dict) and plots:
             active_plots = []
             for name, data in sorted(plots.items()):
                 if isinstance(data, dict) and data.get('status', 'active').lower() == 'active':
+                    plot_npcs = data.get("npcs", [])
+                    plot_locations = data.get("locations", [])
                     active_plots.append({
                         "name": name,
                         "type": data.get("type", "unknown"),
-                        "npcs": len(data.get("npcs", [])),
-                        "locations": len(data.get("locations", []))
+                        "npcs": len(plot_npcs) if isinstance(plot_npcs, list) else 0,
+                        "locations": len(plot_locations) if isinstance(plot_locations, list) else 0
                     })
                     if len(active_plots) >= 5:
                         break
@@ -192,6 +201,8 @@ class WorldStats:
         # Characters (new format: single character.json)
         if self.character_file.exists():
             char_data = self.json_ops.load_json("character.json")
+            if not isinstance(char_data, dict):
+                char_data = {}
             details["characters"] = [{
                 "name": char_data.get("name", "Unknown"),
                 "level": char_data.get("level", 1),
@@ -203,6 +214,8 @@ class WorldStats:
             for char_file in list(self.characters_dir.glob("*.json"))[:5]:
                 # Use relative path from campaign dir
                 char_data = self.json_ops.load_json(f"characters/{char_file.name}")
+                if not isinstance(char_data, dict):
+                    char_data = {}
                 chars.append({
                     "name": char_data.get("name", char_file.stem),
                     "level": char_data.get("level", 1),
