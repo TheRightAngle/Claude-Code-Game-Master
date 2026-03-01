@@ -45,6 +45,11 @@ missing_option_value() {
     exit 1
 }
 
+invalid_n_value() {
+    error "Invalid value for -n: $1 (must be an integer >= 0)"
+    exit 1
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --rag)
@@ -92,13 +97,20 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            if [ -z "$QUERY" ]; then
+            if [[ "$1" == -* ]]; then
+                error "Unknown option: $1. Run --help for usage."
+                exit 1
+            elif [ -z "$QUERY" ]; then
                 QUERY="$1"
             fi
             shift
             ;;
     esac
 done
+
+if [[ ! "$RAG_COUNT" =~ ^[0-9]+$ ]]; then
+    invalid_n_value "$RAG_COUNT"
+fi
 
 # Validate incompatible modes before campaign checks.
 if [ "$WORLD_ONLY" = true ] && [ "$RAG_ONLY" = true ]; then

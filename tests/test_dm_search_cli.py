@@ -78,3 +78,38 @@ def test_dm_search_rejects_missing_value_for_tag_quest_option(tmp_path: Path) ->
 
     assert result.returncode != 0
     assert "Missing value for --tag-quest" in result.stderr
+
+
+def test_dm_search_rejects_unknown_flag_with_actionable_error(tmp_path: Path) -> None:
+    project_root, search_script = _prepare_isolated_search_cli(tmp_path)
+
+    result = subprocess.run(
+        ["bash", str(search_script), "dragon", "--bogus"],
+        cwd=project_root,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=1,
+    )
+
+    assert result.returncode != 0
+    assert "Unknown option: --bogus" in result.stderr
+    assert "No active campaign" not in result.stderr
+
+
+def test_dm_search_rejects_non_integer_n_before_campaign_checks(tmp_path: Path) -> None:
+    project_root, search_script = _prepare_isolated_search_cli(tmp_path)
+
+    result = subprocess.run(
+        ["bash", str(search_script), "dragon", "-n", "foo"],
+        cwd=project_root,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=1,
+    )
+
+    assert result.returncode != 0
+    assert "Invalid value for -n" in result.stderr
+    assert "integer >= 0" in result.stderr
+    assert "No active campaign" not in result.stderr

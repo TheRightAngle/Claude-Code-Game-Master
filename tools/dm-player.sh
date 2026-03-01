@@ -5,13 +5,40 @@
 # Source common utilities
 source "$(dirname "$0")/common.sh"
 
-require_active_campaign
+show_usage() {
+    echo "D&D Player Character Manager"
+    echo "Usage: dm-player.sh <action> [args]"
+    echo ""
+    echo "Actions:"
+    echo "  show [name]                  - Show player(s) summary"
+    echo "  get <name>                   - Get full character JSON"
+    echo "  list                         - List all player IDs"
+    echo "  set <name>                   - Set character as current active PC"
+    echo "  xp <name> +<amount>          - Award XP to character"
+    echo "  hp <name> <+/-amount>        - Modify character HP"
+    echo "  gold <name> [+/-amount]      - Modify or show character gold"
+    echo "  inventory <name> <action>    - Manage inventory (add/remove/list)"
+    echo "  condition <name> <action>    - Manage conditions (add/remove/list)"
+    echo "  loot <name> --gold X --items - Batch add items + gold at once"
+    echo "  level-check <name>           - Check XP and level status"
+    echo "  save-json '<json>'           - Save complete character from JSON"
+    echo ""
+    echo "Note: Character is stored in the active campaign's character.json"
+}
 
-ACTION=$1
-shift
+ACTION="${1:-}"
+if [ $# -gt 0 ]; then
+    shift
+fi
 
 case "$ACTION" in
+    ""|"-h"|"--help"|"help")
+        show_usage
+        exit 0
+        ;;
+
     "show")
+        require_active_campaign
         if [ -z "$1" ]; then
             $PYTHON_CMD "$LIB_DIR/player_manager.py" show
         else
@@ -20,10 +47,12 @@ case "$ACTION" in
         ;;
 
     "list")
+        require_active_campaign
         $PYTHON_CMD "$LIB_DIR/player_manager.py" list
         ;;
 
     "save-json")
+        require_active_campaign
         # Save character from JSON data
         CHARACTER_JSON="$*"
         if [ -z "$CHARACTER_JSON" ]; then
@@ -35,6 +64,7 @@ case "$ACTION" in
         ;;
 
     "set")
+        require_active_campaign
         if [ -z "$1" ]; then
             echo "Usage: dm-player.sh set <character_name>"
             exit 1
@@ -43,6 +73,7 @@ case "$ACTION" in
         ;;
 
     "xp")
+        require_active_campaign
         if [ -z "$1" ] || [ -z "$2" ]; then
             echo "Usage: dm-player.sh xp <character_name> <+amount>"
             exit 1
@@ -51,6 +82,7 @@ case "$ACTION" in
         ;;
 
     "level-check")
+        require_active_campaign
         if [ -z "$1" ]; then
             echo "Usage: dm-player.sh level-check <character_name>"
             exit 1
@@ -59,6 +91,7 @@ case "$ACTION" in
         ;;
 
     "hp")
+        require_active_campaign
         if [ -z "$1" ] || [ -z "$2" ]; then
             echo "Usage: dm-player.sh hp <character_name> <+/-amount>"
             echo "Example: dm-player.sh hp conan -3  (take 3 damage)"
@@ -69,6 +102,7 @@ case "$ACTION" in
         ;;
 
     "get")
+        require_active_campaign
         if [ -z "$1" ]; then
             echo "Usage: dm-player.sh get <character_name>"
             exit 1
@@ -77,6 +111,7 @@ case "$ACTION" in
         ;;
 
     "gold")
+        require_active_campaign
         if [ -z "$1" ]; then
             echo "Usage: dm-player.sh gold <character_name> [+/-amount]"
             echo "Example: dm-player.sh gold theron +50  (gain 50 gold)"
@@ -92,6 +127,7 @@ case "$ACTION" in
         ;;
 
     "inventory")
+        require_active_campaign
         if [ -z "$1" ] || [ -z "$2" ]; then
             echo "Usage: dm-player.sh inventory <character_name> <action> [item]"
             echo ""
@@ -117,6 +153,7 @@ case "$ACTION" in
         ;;
 
     "loot")
+        require_active_campaign
         if [ -z "$1" ]; then
             echo "Usage: dm-player.sh loot <character_name> --gold <amount> --items \"Item1\" \"Item2\" ..."
             echo ""
@@ -130,6 +167,7 @@ case "$ACTION" in
         ;;
 
     "condition")
+        require_active_campaign
         if [ -z "$1" ] || [ -z "$2" ]; then
             echo "Usage: dm-player.sh condition <character_name> <action> [condition]"
             echo ""
@@ -155,24 +193,9 @@ case "$ACTION" in
         ;;
 
     *)
-        echo "D&D Player Character Manager"
-        echo "Usage: dm-player.sh <action> [args]"
-        echo ""
-        echo "Actions:"
-        echo "  show [name]                  - Show player(s) summary"
-        echo "  get <name>                   - Get full character JSON"
-        echo "  list                         - List all player IDs"
-        echo "  set <name>                   - Set character as current active PC"
-        echo "  xp <name> +<amount>          - Award XP to character"
-        echo "  hp <name> <+/-amount>        - Modify character HP"
-        echo "  gold <name> [+/-amount]      - Modify or show character gold"
-        echo "  inventory <name> <action>    - Manage inventory (add/remove/list)"
-        echo "  condition <name> <action>    - Manage conditions (add/remove/list)"
-        echo "  loot <name> --gold X --items - Batch add items + gold at once"
-        echo "  level-check <name>           - Check XP and level status"
-        echo "  save-json '<json>'           - Save complete character from JSON"
-        echo ""
-        echo "Note: Character is stored in the active campaign's character.json"
+        error "Unknown action: $ACTION"
+        show_usage
+        exit 1
         ;;
 esac
 
