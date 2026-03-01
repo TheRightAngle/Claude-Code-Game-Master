@@ -51,7 +51,7 @@ The connection is created bidirectionally with distance, bearing, and terrain st
 Find the shortest route through the connection graph:
 
 ```bash
-bash tools/dm-navigation.sh route "Village" "Ruins"
+bash tools/dm-navigation.sh routes "Village" "Ruins"
 # Route: Village → Old Mill → Forest Path → Ruins
 # Distance: 3400m, Hops: 3
 ```
