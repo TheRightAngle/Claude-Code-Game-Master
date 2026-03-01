@@ -363,7 +363,7 @@ def main():
     resolve_parser = subparsers.add_parser('resolve', help='Resolve firearms combat')
     resolve_parser.add_argument('--attacker', required=True, help='Attacker name')
     resolve_parser.add_argument('--weapon', required=True, help='Weapon name')
-    resolve_parser.add_argument('--fire-mode', required=True, choices=['single', 'burst', 'full_auto'])
+    resolve_parser.add_argument('--fire-mode', required=True, choices=['full_auto'])
     resolve_parser.add_argument('--ammo', type=int, required=True, help='Available ammo')
     resolve_parser.add_argument('--targets', nargs='+', help='Targets as Name:AC:HP:PROT')
     resolve_parser.add_argument('--enemy-type', help='Enemy type from campaign_rules')
@@ -376,36 +376,30 @@ def main():
         parser.print_help()
         sys.exit(1)
 
+    if args.enemy_type is not None or args.enemy_count is not None:
+        parser.error("--enemy-type/--enemy-count are not implemented yet; use --targets Name:AC:HP:PROT")
+    if not args.targets:
+        parser.error("--targets is required; --enemy-type/--enemy-count are not implemented")
+
     try:
         resolver = FirearmsCombatResolver()
 
         targets = []
-        if args.targets:
-            for target_str in args.targets:
-                parts = target_str.split(':')
-                if len(parts) != 4:
-                    print(f"[ERROR] Invalid target format: {target_str}", file=sys.stderr)
-                    print("Expected: Name:AC:HP:PROT", file=sys.stderr)
-                    sys.exit(1)
+        for target_str in args.targets:
+            parts = target_str.split(':')
+            if len(parts) != 4:
+                print(f"[ERROR] Invalid target format: {target_str}", file=sys.stderr)
+                print("Expected: Name:AC:HP:PROT", file=sys.stderr)
+                sys.exit(1)
 
-                targets.append({
-                    "name": parts[0],
-                    "ac": int(parts[1]),
-                    "hp": int(parts[2]),
-                    "prot": int(parts[3])
-                })
-        elif args.enemy_type and args.enemy_count:
-            print("[ERROR] --enemy-type not yet implemented", file=sys.stderr)
-            sys.exit(1)
-        else:
-            print("[ERROR] Must specify either --targets or --enemy-type + --enemy-count", file=sys.stderr)
-            sys.exit(1)
+            targets.append({
+                "name": parts[0],
+                "ac": int(parts[1]),
+                "hp": int(parts[2]),
+                "prot": int(parts[3])
+            })
 
-        if args.fire_mode == 'full_auto':
-            result = resolver.resolve_full_auto(args.weapon, args.ammo, targets)
-        else:
-            print(f"[ERROR] Fire mode '{args.fire_mode}' not yet implemented", file=sys.stderr)
-            sys.exit(1)
+        result = resolver.resolve_full_auto(args.weapon, args.ammo, targets)
 
         print(format_combat_output(result))
 
@@ -419,7 +413,7 @@ def main():
         else:
             resolver.update_character_after_combat(result['shots_fired'], result['total_xp'])
             print(f"\n[AUTO-PERSIST] Updated character XP: +{result['total_xp']}")
-            print(f"[AUTO-PERSIST] Ammo remaining: {result['ammo_remaining']}")
+            print(f"[MANUAL] Ammo is not auto-persisted. Remaining after combat: {result['ammo_remaining']}")
             print("NOTE: Update ammo manually with: bash tools/dm-player.sh inventory")
 
     except RuntimeError as e:

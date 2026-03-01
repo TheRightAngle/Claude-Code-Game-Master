@@ -13,7 +13,7 @@ if [ "$#" -lt 1 ]; then
     echo "Actions:"
     echo "  add <name> <position> --from <loc> --bearing <deg> --distance <m> [--terrain <type>]"
     echo "                                            - Add location with coordinates"
-    echo "  move <location> [--speed-multiplier X]     - Move party with distance-based time calc"
+    echo "  move <location> [--speed-multiplier X] [--json] - Move party with distance-based time calc"
     echo "  connect <from> <to> <path> [--terrain <type>] [--distance <m>]"
     echo "                                            - Create connection with metadata"
     echo "  decide <from> <to>                        - Interactive route decision"
@@ -28,6 +28,7 @@ if [ "$#" -lt 1 ]; then
     echo "Examples:"
     echo "  dm-navigation.sh add \"Temple\" \"1km north\" --from \"Village\" --bearing 0 --distance 1000"
     echo "  dm-navigation.sh move \"Temple\" --speed-multiplier 1.5"
+    echo "  dm-navigation.sh move \"Temple\" --json"
     echo "  dm-navigation.sh connect \"Village\" \"Temple\" \"Overgrown path\" --terrain forest --distance 1000"
     echo "  dm-navigation.sh decide \"Village\" \"Temple\""
     echo "  dm-navigation.sh routes \"Village\" \"Temple\""
@@ -53,7 +54,7 @@ case "$ACTION" in
 
     move)
         if [ "$#" -lt 1 ]; then
-            echo "Usage: dm-navigation.sh move <location> [--speed-multiplier X]"
+            echo "Usage: dm-navigation.sh move <location> [--speed-multiplier X] [--json]"
             exit 1
         fi
         $PYTHON_CMD "$MODULE_DIR/lib/navigation_manager.py" move "$CAMPAIGN_DIR" "$@"

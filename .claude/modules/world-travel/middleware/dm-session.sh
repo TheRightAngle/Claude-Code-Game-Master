@@ -56,43 +56,58 @@ if [ -f "$VEHICLE_PY" ]; then
     fi
 fi
 
-# Run navigation move (calculates distance/time, moves party)
-# Capture output and exit code
-NAV_OUTPUT=$(bash "$MODULE_DIR/tools/dm-navigation.sh" move "$@" 2>&1)
+# Run navigation move in machine-readable mode (calculates distance/time, moves party)
+NAV_OUTPUT=$(bash "$MODULE_DIR/tools/dm-navigation.sh" move "$@" --json 2>&1)
 NAV_RC=$?
-echo "$NAV_OUTPUT"
 
 [ $NAV_RC -eq 0 ] || exit $NAV_RC  # Propagate navigation failure to caller.
 
-# Extract distance_meters from navigation output JSON if present
-DISTANCE_METERS=$(echo "$NAV_OUTPUT" | python3 -c "
-import sys, json, re
+NAV_PARSED=$(echo "$NAV_OUTPUT" | python3 -c "
+import json
+import sys
+
 text = sys.stdin.read()
-# Try to find JSON in output
-m = re.search(r'\{[^}]+\"distance_meters\"[^}]+\}', text)
-if m:
+data = None
+
+for line in reversed([ln.strip() for ln in text.splitlines() if ln.strip()]):
+    if not (line.startswith('{') and line.endswith('}')):
+        continue
     try:
-        d = json.loads(m.group())
-        print(d.get('distance_meters', 0))
-        sys.exit(0)
-    except:
-        pass
-print(0)
+        data = json.loads(line)
+        break
+    except Exception:
+        continue
+
+if data is None:
+    data = json.loads(text)
+
+print(data.get('location', ''))
+print(data.get('distance_meters') or 0)
+print(data.get('terrain', 'open') or 'open')
+print(data.get('elapsed_hours') or 0)
 " 2>/dev/null)
 
-TERRAIN=$(echo "$NAV_OUTPUT" | python3 -c "
-import sys, json, re
-text = sys.stdin.read()
-m = re.search(r'\{[^}]+\"terrain\"[^}]+\}', text)
-if m:
-    try:
-        d = json.loads(m.group())
-        print(d.get('terrain', 'open'))
-        sys.exit(0)
-    except:
-        pass
-print('open')
-" 2>/dev/null)
+if [ -z "$NAV_PARSED" ]; then
+    echo "$NAV_OUTPUT"
+    echo "[ERROR] Failed to parse navigation JSON output" >&2
+    exit 1
+fi
+
+LOCATION_OUT=$(echo "$NAV_PARSED" | sed -n '1p')
+DISTANCE_METERS=$(echo "$NAV_PARSED" | sed -n '2p')
+TERRAIN=$(echo "$NAV_PARSED" | sed -n '3p')
+ELAPSED_HOURS=$(echo "$NAV_PARSED" | sed -n '4p')
+
+echo "[SUCCESS] Moved to: $LOCATION_OUT"
+if [ -n "$DISTANCE_METERS" ] && [ "$DISTANCE_METERS" -gt 0 ] 2>/dev/null; then
+    echo "  Distance: ${DISTANCE_METERS}m"
+fi
+if [ -n "$ELAPSED_HOURS" ] && [ "$ELAPSED_HOURS" != "0" ]; then
+    python3 - "$ELAPSED_HOURS" <<'PYCODE'
+import sys
+print(f"  Travel time: {float(sys.argv[1]):.2f} hours")
+PYCODE
+fi
 
 # Auto encounter check if distance known and encounter-system rules apply
 if [ -n "$DISTANCE_METERS" ] && [ "$DISTANCE_METERS" -gt 0 ] 2>/dev/null; then

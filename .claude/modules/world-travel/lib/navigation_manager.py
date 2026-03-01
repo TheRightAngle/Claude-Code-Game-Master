@@ -299,7 +299,12 @@ class NavigationManager:
         print("=" * 60)
         return True
 
-    def move_with_navigation(self, location: str, speed_multiplier: float = 1.0) -> Dict:
+    def move_with_navigation(
+        self,
+        location: str,
+        speed_multiplier: float = 1.0,
+        emit_logs: bool = True
+    ) -> Dict:
         """
         Move party with distance-based time calculation.
 
@@ -313,6 +318,8 @@ class NavigationManager:
         """
         import shutil
         import subprocess
+        import io
+        from contextlib import redirect_stderr, redirect_stdout
 
         campaign_overview = self.json_ops.load_json("campaign-overview.json")
         character_data = self.json_ops.load_json("character.json")
@@ -336,8 +343,10 @@ class NavigationManager:
             return {"success": False, "error": f"No connection between '{current_location}' and '{location}'"}
 
         distance_meters = connection.get("distance_meters")
+        terrain = connection.get("terrain", "open") or "open"
         if not distance_meters:
-            print("[WARNING] No distance_meters in connection — skipping time calculation")
+            if emit_logs:
+                print("[WARNING] No distance_meters in connection — skipping time calculation")
             elapsed_hours = 0
         else:
             speed_kmh = character_data.get("speed_kmh", 4.0)
@@ -349,7 +358,8 @@ class NavigationManager:
             if survival_stats_script.exists():
                 bash_path = shutil.which("bash")
                 if not bash_path:
-                    print("[WARNING] bash executable not found; skipping custom-stats time advance")
+                    if emit_logs:
+                        print("[WARNING] bash executable not found; skipping custom-stats time advance")
                 else:
                     try:
                         result = subprocess.run(
@@ -358,17 +368,24 @@ class NavigationManager:
                             text=True,
                             check=False
                         )
-                        if result.returncode == 0:
+                        if result.returncode == 0 and emit_logs:
                             print(result.stdout.strip())
-                        else:
+                        elif result.returncode != 0 and emit_logs:
                             print(f"[WARNING] custom-stats time advance failed: {result.stderr.strip()}")
                     except Exception as e:
-                        print(f"[WARNING] Could not call custom-stats module: {e}")
+                        if emit_logs:
+                            print(f"[WARNING] Could not call custom-stats module: {e}")
             else:
-                print(f"[INFO] Travel time: {elapsed_hours:.2f} hours ({distance_meters}m)")
+                if emit_logs:
+                    print(f"[INFO] Travel time: {elapsed_hours:.2f} hours ({distance_meters}m)")
 
         session_mgr = SessionManager()
-        move_result = session_mgr.move_party(location)
+        if emit_logs:
+            move_result = session_mgr.move_party(location)
+        else:
+            # JSON mode must keep stdout machine-readable for middleware consumers.
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                move_result = session_mgr.move_party(location)
 
         if "current_location" not in move_result:
             return {"success": False, "error": move_result.get("message", "Move failed")}
@@ -377,6 +394,7 @@ class NavigationManager:
             "success": True,
             "location": location,
             "distance_meters": distance_meters,
+            "terrain": terrain,
             "elapsed_hours": elapsed_hours
         }
 
@@ -474,6 +492,7 @@ if __name__ == "__main__":
     move_parser.add_argument('campaign_dir', help='Campaign directory path')
     move_parser.add_argument('location', help='Destination location')
     move_parser.add_argument('--speed-multiplier', type=float, default=1.0, help='Speed multiplier (default 1.0)')
+    move_parser.add_argument('--json', dest='json_output', action='store_true', help='Machine-readable result output')
 
     connect_parser = subparsers.add_parser('connect', help='Create connection with metadata')
     connect_parser.add_argument('campaign_dir', help='Campaign directory path')
@@ -531,15 +550,27 @@ if __name__ == "__main__":
             sys.exit(1)
 
     elif args.action == 'move':
-        result = manager.move_with_navigation(args.location, args.speed_multiplier)
+        import json
+
+        result = manager.move_with_navigation(
+            args.location,
+            args.speed_multiplier,
+            emit_logs=not args.json_output
+        )
         if not result.get("success"):
-            print(f"[ERROR] {result.get('error')}")
+            if args.json_output:
+                print(json.dumps(result, ensure_ascii=False))
+            else:
+                print(f"[ERROR] {result.get('error')}")
             sys.exit(1)
-        print(f"[SUCCESS] Moved to: {result['location']}")
-        if result.get('distance_meters'):
-            print(f"  Distance: {result['distance_meters']}m")
-        if result.get('elapsed_hours'):
-            print(f"  Travel time: {result['elapsed_hours']:.2f} hours")
+        if args.json_output:
+            print(json.dumps(result, ensure_ascii=False))
+        else:
+            print(f"[SUCCESS] Moved to: {result['location']}")
+            if result.get('distance_meters'):
+                print(f"  Distance: {result['distance_meters']}m")
+            if result.get('elapsed_hours'):
+                print(f"  Travel time: {result['elapsed_hours']:.2f} hours")
 
     elif args.action == 'connect':
         if not manager.connect_with_metadata(

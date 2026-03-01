@@ -52,7 +52,6 @@
     ],
     "commands": {
       "dm-navigation.sh move <location>": "Move party with distance/time calc + auto encounter",
-      "dm-navigation.sh route <from> <to>": "Calculate route and distance",
       "dm-navigation.sh decide <from> <to>": "Interactive route decision (cached)",
       "dm-navigation.sh routes <from> <to>": "Show all possible routes",
       "dm-navigation.sh block <loc> <from_deg> <to_deg> <reason>": "Block direction range",

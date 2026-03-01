@@ -6,6 +6,7 @@ Uses isolated fake campaigns with tmp_path fixture
 
 import json
 import pytest
+import subprocess
 from pathlib import Path
 import sys
 
@@ -185,6 +186,78 @@ def test_character_update_after_combat(fake_campaign):
 
         updated_char = resolver.player_mgr.get_player("Test Stalker")
         assert updated_char["xp"]["current"] > initial_xp
+
+
+def _run_firearms_cli(world_state: Path, *args: str) -> subprocess.CompletedProcess:
+    resolver_script = Path(__file__).parent.parent / "lib" / "firearms_resolver.py"
+    command = [sys.executable, str(resolver_script), "resolve", *args]
+    return subprocess.run(
+        command,
+        cwd=world_state.parent,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_cli_rejects_unimplemented_fire_mode_at_parse_time(fake_campaign):
+    result = _run_firearms_cli(
+        fake_campaign,
+        "--attacker",
+        "Test Stalker",
+        "--weapon",
+        "AK-74",
+        "--fire-mode",
+        "burst",
+        "--ammo",
+        "10",
+        "--targets",
+        "Snork:12:15:2",
+    )
+
+    assert result.returncode == 2
+    assert "invalid choice" in result.stderr
+
+
+def test_cli_rejects_unimplemented_enemy_type_flags_at_parse_time(fake_campaign):
+    result = _run_firearms_cli(
+        fake_campaign,
+        "--attacker",
+        "Test Stalker",
+        "--weapon",
+        "AK-74",
+        "--fire-mode",
+        "full_auto",
+        "--ammo",
+        "10",
+        "--enemy-type",
+        "snork",
+        "--enemy-count",
+        "2",
+    )
+
+    assert result.returncode == 2
+    assert "--enemy-type/--enemy-count are not implemented" in result.stderr
+
+
+def test_cli_non_test_mode_reports_ammo_as_manual_persistence(fake_campaign):
+    result = _run_firearms_cli(
+        fake_campaign,
+        "--attacker",
+        "Test Stalker",
+        "--weapon",
+        "AK-74",
+        "--fire-mode",
+        "full_auto",
+        "--ammo",
+        "10",
+        "--targets",
+        "Snork:12:15:2",
+    )
+
+    assert result.returncode == 0
+    assert "[AUTO-PERSIST] Updated character XP:" in result.stdout
+    assert "Ammo is not auto-persisted." in result.stdout
 
 
 if __name__ == "__main__":
