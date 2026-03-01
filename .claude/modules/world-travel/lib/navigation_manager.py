@@ -311,8 +311,8 @@ class NavigationManager:
         6. Call CORE session_manager.move_party(location) for the actual move
         7. Return result dict
         """
+        import shutil
         import subprocess
-        from pathlib import Path
 
         campaign_overview = self.json_ops.load_json("campaign-overview.json")
         character_data = self.json_ops.load_json("character.json")
@@ -347,19 +347,23 @@ class NavigationManager:
 
         if elapsed_hours > 0:
             if survival_stats_script.exists():
-                try:
-                    result = subprocess.run(
-                        ["bash", str(survival_stats_script), "time", str(elapsed_hours)],
-                        capture_output=True,
-                        text=True,
-                        check=False
-                    )
-                    if result.returncode == 0:
-                        print(result.stdout.strip())
-                    else:
-                        print(f"[WARNING] custom-stats time advance failed: {result.stderr.strip()}")
-                except Exception as e:
-                    print(f"[WARNING] Could not call custom-stats module: {e}")
+                bash_path = shutil.which("bash")
+                if not bash_path:
+                    print("[WARNING] bash executable not found; skipping custom-stats time advance")
+                else:
+                    try:
+                        result = subprocess.run(
+                            [bash_path, str(survival_stats_script), "time", str(elapsed_hours)],
+                            capture_output=True,
+                            text=True,
+                            check=False
+                        )
+                        if result.returncode == 0:
+                            print(result.stdout.strip())
+                        else:
+                            print(f"[WARNING] custom-stats time advance failed: {result.stderr.strip()}")
+                    except Exception as e:
+                        print(f"[WARNING] Could not call custom-stats module: {e}")
             else:
                 print(f"[INFO] Travel time: {elapsed_hours:.2f} hours ({distance_meters}m)")
 
