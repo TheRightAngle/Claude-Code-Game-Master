@@ -8,6 +8,8 @@ Supports multi-campaign system (saves to active campaign's character.json)
 import json
 import sys
 import os
+import re
+from numbers import Real
 from pathlib import Path
 
 # Add lib directory to path for imports
@@ -79,7 +81,10 @@ def calculate_saves(class_name, level, stats):
 
 def create_character_id(name):
     """Convert character name to file-safe ID"""
-    return name.lower().replace(' ', '-').replace("'", '').replace('"', '')
+    base = name.lower().replace(' ', '-').replace("'", '').replace('"', '')
+    safe_id = re.sub(r"[^a-z0-9-]", "", base)
+    safe_id = re.sub(r"-{2,}", "-", safe_id).strip("-")
+    return safe_id or "character"
 
 STAT_ALIASES = {
     'strength': 'str', 'dexterity': 'dex', 'constitution': 'con',
@@ -109,6 +114,10 @@ def save_character(character_data):
     missing_stats = [stat for stat in required_stats if stat not in character_data['stats']]
     if missing_stats:
         return {"error": f"Missing required stats: {', '.join(missing_stats)}"}
+    for stat in required_stats:
+        value = character_data['stats'][stat]
+        if isinstance(value, bool) or not isinstance(value, Real):
+            return {"error": f"Invalid stat value for '{stat}': expected a number"}
 
     # Generate character ID
     char_id = create_character_id(character_data['name'])

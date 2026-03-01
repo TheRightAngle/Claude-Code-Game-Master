@@ -8,22 +8,29 @@ Example: uv run python get_traits.py elf
 import sys
 import argparse
 from pathlib import Path
+from urllib.parse import urlparse
 sys.path.append(str(Path(__file__).parent.parent))
 
 from character_creation_core import fetch, output, error_output
 
+def normalize_trait_endpoint(trait_url):
+    """Normalize absolute or relative trait URL into API endpoint format."""
+    parsed_url = urlparse(trait_url)
+    if parsed_url.scheme and parsed_url.netloc:
+        endpoint = parsed_url.path
+    else:
+        endpoint = trait_url
+
+    endpoint = endpoint.strip()
+    if endpoint.startswith("/api/2014"):
+        endpoint = endpoint[len("/api/2014"):]
+    if not endpoint.startswith("/"):
+        endpoint = f"/{endpoint}"
+    return endpoint
+
 def get_trait_details(trait_url):
     """Fetch details for a specific trait"""
-    # Handle both full URLs and relative URLs
-    if trait_url.startswith("http"):
-        # Extract endpoint from full URL
-        endpoint = trait_url.replace("https://www.dnd5eapi.co/api/2014", "")
-    elif trait_url.startswith("/api/2014"):
-        # Already a relative URL with /api/2014 prefix - strip it
-        endpoint = trait_url.replace("/api/2014", "")
-    else:
-        # Already the correct endpoint format
-        endpoint = trait_url
+    endpoint = normalize_trait_endpoint(trait_url)
 
     trait_data = fetch(endpoint)
     

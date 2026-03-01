@@ -26,8 +26,19 @@ def get_monsters_by_cr(target_cr):
         with urllib.request.urlopen(url) as response:
             data = json.loads(response.read())
             if "results" in data:
-                # Extract monster indices from URLs
-                return [m["url"].split("/")[-1] for m in data["results"]]
+                monsters = []
+                for monster in data["results"]:
+                    monster_url = monster.get("url", "")
+                    monster_index = monster_url.rstrip("/").split("/")[-1]
+                    if not monster_index:
+                        continue
+                    monsters.append(
+                        {
+                            "index": monster_index,
+                            "name": monster.get("name", monster_index),
+                        }
+                    )
+                return monsters
             return []
     except urllib.error.HTTPError as e:
         if e.code == 429:
@@ -46,6 +57,9 @@ def main():
     parser.add_argument('--quick', action='store_true', help='Just return monster names')
     
     args = parser.parse_args()
+
+    if args.count < 0:
+        error_output("--count must be 0 or greater")
     
     # Get available monsters for this CR
     available = get_monsters_by_cr(args.cr)
@@ -62,16 +76,19 @@ def main():
         selected = random.sample(available, args.count)
     
     if args.quick:
-        # Just output the names
+        # Just output the human-readable names.
         output({
             "cr": args.cr,
             "count": args.count,
-            "monsters": selected
+            "monsters": [monster.get("name", monster.get("index", "")) for monster in selected]
         })
     else:
         # Fetch full details
         monsters = []
-        for monster_index in selected:
+        for monster in selected:
+            monster_index = monster.get("index")
+            if not monster_index:
+                continue
             data = fetch(f"/monsters/{monster_index}")
             if "error" not in data:
                 # Extract combat info

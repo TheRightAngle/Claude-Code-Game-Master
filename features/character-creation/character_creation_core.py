@@ -10,13 +10,14 @@ import urllib.request
 import urllib.error
 
 BASE_URL = "https://www.dnd5eapi.co/api/2014"
+REQUEST_TIMEOUT = 10
 
 def fetch(endpoint):
     """Fetch data from API and return as dict"""
     url = f"{BASE_URL}{endpoint}"
     
     try:
-        with urllib.request.urlopen(url) as response:
+        with urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT) as response:
             return json.loads(response.read().decode())
     except urllib.error.HTTPError as e:
         return {"error": f"HTTP {e.code}", "message": e.reason}

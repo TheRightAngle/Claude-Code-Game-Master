@@ -24,20 +24,27 @@ def fetch_spell_details(spell_index):
 def filter_spells(spells, args):
     """Apply filters to spell list"""
     results = []
+    needs_detail_fetch = any(
+        [
+            args.level is not None,
+            args.school,
+            args.spell_class,
+            args.ritual,
+            args.concentration,
+        ]
+    )
     
     for spell in spells:
-        # For filtering, we need full spell details
-        if args.level is not None or args.school or args.spell_class or args.ritual or args.concentration:
+        # Search filter is cheap and can avoid unnecessary detail fetches.
+        if args.search and args.search.lower() not in spell.get("name", "").lower():
+            continue
+
+        if needs_detail_fetch:
             spell_data = fetch_spell_details(spell["index"])
             if "error" in spell_data:
                 continue
         else:
             spell_data = spell
-        
-        # Search filter (works on basic data)
-        if args.search:
-            if args.search.lower() not in spell.get("name", "").lower():
-                continue
         
         # Level filter
         if args.level is not None:
@@ -129,6 +136,9 @@ def main():
                        help='Maximum results (default: 20)')
     
     args = parser.parse_args()
+
+    if args.limit < 0:
+        error_output("--limit must be 0 or greater")
     
     # Fetch all spells
     data = fetch("/api/2014/spells")
