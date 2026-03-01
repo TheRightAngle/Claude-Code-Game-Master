@@ -62,7 +62,7 @@ NAV_OUTPUT=$(bash "$MODULE_DIR/tools/dm-navigation.sh" move "$@" 2>&1)
 NAV_RC=$?
 echo "$NAV_OUTPUT"
 
-[ $NAV_RC -eq 0 ] || exit $NAV_RC  # propagate navigation failure to caller
+[ $NAV_RC -eq 0 ] || exit $NAV_RC  # Propagate navigation failure to caller.
 
 # Extract distance_meters from navigation output JSON if present
 DISTANCE_METERS=$(echo "$NAV_OUTPUT" | python3 -c "

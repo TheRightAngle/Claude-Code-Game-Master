@@ -17,7 +17,7 @@ class ModuleLoader:
 
     def __init__(self, project_root: Optional[Path] = None):
         if project_root is None:
-            # .claude/modules/module_loader.py -> repo root is three levels up
+            # .claude/modules/module_loader.py -> repository root is three levels up.
             project_root = Path(__file__).resolve().parent.parent.parent
         self.project_root = project_root
         self.modules_dir = self.project_root / ".claude" / "modules"
