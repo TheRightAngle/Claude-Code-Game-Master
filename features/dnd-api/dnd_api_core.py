@@ -8,16 +8,31 @@ import json
 import sys
 import urllib.request
 import urllib.error
+import urllib.parse
 
 BASE_URL = "https://www.dnd5eapi.co/api/2014"
 REQUEST_TIMEOUT = 10
+
+
+def _validate_base_url(base_url):
+    parsed = urllib.parse.urlparse(base_url)
+    if parsed.scheme.lower() not in ("http", "https"):
+        raise ValueError("BASE_URL must use http or https scheme")
+
+
+def _open_url_with_timeout(url):
+    request = urllib.request.Request(url)
+    opener = urllib.request.build_opener()
+    return opener.open(request, timeout=REQUEST_TIMEOUT)
+
 
 def fetch(endpoint):
     """Fetch data from D&D API and return as dict"""
     url = f"{BASE_URL}{endpoint}"
     
     try:
-        with urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT) as response:
+        _validate_base_url(BASE_URL)
+        with _open_url_with_timeout(url) as response:
             return json.loads(response.read().decode())
     except urllib.error.HTTPError as e:
         return {"error": f"HTTP {e.code}", "message": e.reason}

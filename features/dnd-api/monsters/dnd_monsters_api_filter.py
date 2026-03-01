@@ -13,6 +13,21 @@ import urllib.request
 import urllib.error
 
 BASE_URL = "https://www.dnd5eapi.co"
+REQUEST_TIMEOUT = 10
+
+
+def _validated_base_url() -> str:
+    parsed = urllib.parse.urlparse(BASE_URL)
+    if parsed.scheme not in {"http", "https"}:
+        scheme = parsed.scheme or "<empty>"
+        raise ValueError(f"Invalid BASE_URL scheme: {scheme}")
+    return BASE_URL.rstrip("/")
+
+
+def _urlopen_with_timeout(url: str):
+    request = urllib.request.Request(url)
+    opener = urllib.request.build_opener()
+    return opener.open(request, timeout=REQUEST_TIMEOUT)
 
 
 def fetch_monsters(
@@ -31,21 +46,21 @@ def fetch_monsters(
     Returns:
         API response containing monster list
     """
-    url = f"{BASE_URL}/api/2014/monsters"
-    params = []
-    
-    # Add challenge_rating query parameter
-    if challenge_ratings:
-        # API expects comma-separated values
-        cr_param = ",".join(str(cr) for cr in challenge_ratings)
-        params.append(f"challenge_rating={cr_param}")
-    
-    # Build final URL with parameters
-    if params:
-        url += "?" + "&".join(params)
-    
     try:
-        with urllib.request.urlopen(url) as response:
+        url = f"{_validated_base_url()}/api/2014/monsters"
+        params = []
+
+        # Add challenge_rating query parameter
+        if challenge_ratings:
+            # API expects comma-separated values
+            cr_param = ",".join(str(cr) for cr in challenge_ratings)
+            params.append(f"challenge_rating={cr_param}")
+
+        # Build final URL with parameters
+        if params:
+            url += "?" + "&".join(params)
+
+        with _urlopen_with_timeout(url) as response:
             data = json.loads(response.read())
             
             # Apply search filter if provided

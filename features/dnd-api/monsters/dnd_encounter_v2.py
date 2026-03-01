@@ -9,6 +9,7 @@ import sys
 import argparse
 import random
 import json
+import urllib.parse
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -17,13 +18,28 @@ sys.path.append(str(Path(__file__).parent.parent))
 from dnd_api_core import fetch, output, error_output
 
 BASE_URL = "https://www.dnd5eapi.co"
+REQUEST_TIMEOUT = 10
+
+
+def _validated_base_url():
+    parsed = urllib.parse.urlparse(BASE_URL)
+    if parsed.scheme not in {"http", "https"}:
+        scheme = parsed.scheme or "<empty>"
+        raise ValueError(f"Invalid BASE_URL scheme: {scheme}")
+    return BASE_URL.rstrip("/")
+
+
+def _urlopen_with_timeout(url):
+    request = urllib.request.Request(url)
+    opener = urllib.request.build_opener()
+    return opener.open(request, timeout=REQUEST_TIMEOUT)
+
 
 def get_monsters_by_cr(target_cr):
     """Get all monsters of a specific CR using API filtering"""
-    url = f"{BASE_URL}/api/2014/monsters?challenge_rating={target_cr}"
-    
     try:
-        with urllib.request.urlopen(url) as response:
+        url = f"{_validated_base_url()}/api/2014/monsters?challenge_rating={target_cr}"
+        with _urlopen_with_timeout(url) as response:
             data = json.loads(response.read())
             if "results" in data:
                 monsters = []

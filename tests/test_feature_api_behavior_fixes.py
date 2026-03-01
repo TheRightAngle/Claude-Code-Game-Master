@@ -262,11 +262,16 @@ def test_monsters_api_filter_count_matches_limited_results(monkeypatch):
         b'{"name": "C", "url": "/api/2014/monsters/c"}]}'
     )
 
+    class DummyOpener:
+        def open(self, _request, timeout=None):
+            return DummyResponse(payload)
+
     monkeypatch.setattr(
         module.urllib.request,
         "urlopen",
-        lambda _url: DummyResponse(payload),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("urlopen should not be called")),
     )
+    monkeypatch.setattr(module.urllib.request, "build_opener", lambda: DummyOpener())
 
     result = module.fetch_monsters(limit=2)
 
@@ -347,11 +352,17 @@ def test_api_core_fetch_uses_timeout(module_path, monkeypatch):
         def __exit__(self, exc_type, exc, tb):
             return False
 
-    def fake_urlopen(url, timeout=None):
-        calls.append({"url": url, "timeout": timeout})
-        return DummyResponse()
+    class DummyOpener:
+        def open(self, request, timeout=None):
+            calls.append({"url": request.full_url, "timeout": timeout})
+            return DummyResponse()
 
-    monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        module.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("urlopen should not be called")),
+    )
+    monkeypatch.setattr(module.urllib.request, "build_opener", lambda: DummyOpener())
     module.fetch("/test-endpoint")
 
     assert calls
@@ -399,7 +410,16 @@ def test_encounter_v2_quick_mode_outputs_human_names(monkeypatch):
         }
     ).encode("utf-8")
 
-    monkeypatch.setattr(module.urllib.request, "urlopen", lambda _url: DummyResponse(payload))
+    class DummyOpener:
+        def open(self, _request, timeout=None):
+            return DummyResponse(payload)
+
+    monkeypatch.setattr(
+        module.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("urlopen should not be called")),
+    )
+    monkeypatch.setattr(module.urllib.request, "build_opener", lambda: DummyOpener())
     monkeypatch.setattr(module.random, "sample", lambda items, count: items[:count])
     monkeypatch.setattr(module, "output", lambda data: captured.setdefault("data", data))
     monkeypatch.setattr(module.sys, "argv", ["dnd_encounter_v2.py", "--cr", "1", "--count", "2", "--quick"])
