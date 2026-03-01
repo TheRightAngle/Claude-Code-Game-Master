@@ -14,6 +14,19 @@ from character_creation_core import fetch, output, error_output
 
 def extract_class_details(class_data):
     """Extract key class information"""
+    proficiency_choices = class_data.get("proficiency_choices", [])
+    choice_groups = [
+        {
+            "choose": choice.get("choose", 0),
+            "from": [
+                option.get("item", {}).get("name", "")
+                for option in choice.get("from", {}).get("options", [])
+            ],
+        }
+        for choice in proficiency_choices
+    ]
+    primary_skill_choice = choice_groups[0] if choice_groups else {"choose": 0, "from": []}
+
     return {
         "name": class_data.get("name", "Unknown"),
         "hit_die": class_data.get("hit_die", 0),
@@ -25,11 +38,9 @@ def extract_class_details(class_data):
             prof.get("name", "") for prof in class_data.get("proficiencies", [])
         ],
         "skill_choices": {
-            "choose": class_data.get("proficiency_choices", [{}])[0].get("choose", 0) if class_data.get("proficiency_choices") else 0,
-            "from": [
-                option.get("item", {}).get("name", "") 
-                for option in class_data.get("proficiency_choices", [{}])[0].get("from", {}).get("options", [])
-            ] if class_data.get("proficiency_choices") else []
+            "choose": primary_skill_choice["choose"],
+            "from": primary_skill_choice["from"],
+            "groups": choice_groups,
         },
         "starting_equipment": [
             equip.get("equipment", {}).get("name", "") 

@@ -155,7 +155,7 @@ def main():
     
     # Apply limit
     total = len(spells)
-    if args.limit and len(spells) > args.limit:
+    if args.limit is not None and len(spells) > args.limit:
         spells = spells[:args.limit]
     
     # Format output

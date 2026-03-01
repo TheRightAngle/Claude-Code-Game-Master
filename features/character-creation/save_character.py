@@ -106,6 +106,11 @@ def save_character(character_data):
         if field not in character_data:
             return {"error": f"Missing required field: {field}"}
 
+    for field in ['name', 'race', 'class']:
+        value = character_data.get(field)
+        if not isinstance(value, str) or not value.strip():
+            return {"error": f"Field '{field}' must be a non-empty string"}
+
     if not isinstance(character_data['stats'], dict):
         return {"error": "Field 'stats' must be an object/dictionary"}
 

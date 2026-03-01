@@ -51,5 +51,5 @@ def error_output(message):
 def format_spell_index(spell_name):
     """Convert spell name to API index format"""
     # Convert to lowercase and replace spaces with hyphens
-    # Handle special cases like apostrophes
-    return spell_name.lower().replace(" ", "-").replace("'", "")
+    # Handle special cases like straight and smart apostrophes
+    return spell_name.lower().replace(" ", "-").replace("'", "").replace("’", "")

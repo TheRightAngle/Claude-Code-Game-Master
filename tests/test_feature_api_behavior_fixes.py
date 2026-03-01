@@ -470,6 +470,67 @@ def test_list_spells_rejects_negative_limit(monkeypatch):
         module.main()
 
 
+def test_list_spells_honors_zero_limit(monkeypatch):
+    module = load_module("features/spells/list_spells.py")
+    captured = {}
+
+    def fake_fetch(endpoint):
+        assert endpoint == "/api/2014/spells"
+        return {
+            "count": 2,
+            "results": [
+                {"index": "fire-bolt", "name": "Fire Bolt", "url": "/api/2014/spells/fire-bolt"},
+                {"index": "mage-hand", "name": "Mage Hand", "url": "/api/2014/spells/mage-hand"},
+            ],
+        }
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+    monkeypatch.setattr(module, "output", lambda payload: captured.setdefault("payload", payload))
+    monkeypatch.setattr(module.sys, "argv", ["list_spells.py", "--limit", "0"])
+
+    module.main()
+
+    assert captured["payload"]["count"] == 0
+    assert captured["payload"]["total"] == 2
+    assert captured["payload"]["results"] == []
+
+
+def test_get_spell_main_normalizes_smart_quotes_in_lookup(monkeypatch):
+    module = load_module("features/spells/get_spell.py")
+
+    endpoints = []
+
+    def fake_fetch(endpoint):
+        endpoints.append(endpoint)
+        return {"name": "Any"}
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+    monkeypatch.setattr(module, "output", lambda _data: None)
+    monkeypatch.setattr(module.sys, "argv", ["get_spell.py", "Melf’s Acid Arrow"])
+
+    module.main()
+
+    assert endpoints[0] == "/api/2014/spells/melfs-acid-arrow"
+
+
+def test_dnd_magic_item_main_normalizes_smart_quotes_in_lookup(monkeypatch):
+    module = load_module("features/gear/dnd_magic_item.py")
+
+    endpoints = []
+
+    def fake_fetch(endpoint):
+        endpoints.append(endpoint)
+        return {"name": "Any"}
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+    monkeypatch.setattr(module, "output", lambda _data: None)
+    monkeypatch.setattr(module.sys, "argv", ["dnd_magic_item.py", "Dragon’s Wrath Weapon"])
+
+    module.main()
+
+    assert endpoints[0] == "/magic-items/dragons-wrath-weapon"
+
+
 def test_filter_spells_applies_search_before_fetching_details(monkeypatch):
     module = load_module("features/spells/list_spells.py")
 
@@ -520,6 +581,53 @@ def test_save_character_rejects_invalid_level_values(bad_level):
 
     assert "error" in result
     assert "level" in result["error"].lower()
+
+
+def test_save_character_rejects_invalid_required_field_type():
+    module = load_module("features/character-creation/save_character.py")
+
+    result = module.save_character(
+        {
+            "name": None,
+            "race": "Human",
+            "class": "Fighter",
+            "level": 1,
+            "stats": {"str": 14, "dex": 12, "con": 13, "int": 10, "wis": 10, "cha": 8},
+        }
+    )
+
+    assert "error" in result
+    assert result["error"] == "Field 'name' must be a non-empty string"
+
+
+def test_get_class_details_preserves_all_proficiency_choice_groups():
+    module = load_module("features/character-creation/api/get_class_details.py")
+
+    details = module.extract_class_details(
+        {
+            "name": "Fighter",
+            "proficiency_choices": [
+                {
+                    "choose": 2,
+                    "from": {
+                        "options": [
+                            {"item": {"name": "Skill: Acrobatics"}},
+                            {"item": {"name": "Skill: Animal Handling"}},
+                        ]
+                    },
+                },
+                {
+                    "choose": 1,
+                    "from": {"options": [{"item": {"name": "Skill: Insight"}}]},
+                },
+            ],
+        }
+    )
+
+    assert details["skill_choices"]["groups"] == [
+        {"choose": 2, "from": ["Skill: Acrobatics", "Skill: Animal Handling"]},
+        {"choose": 1, "from": ["Skill: Insight"]},
+    ]
 
 
 def test_dnd_monsters_cr_table_has_correct_red_dragon_wyrmling_cr():

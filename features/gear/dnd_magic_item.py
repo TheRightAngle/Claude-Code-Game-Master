@@ -45,7 +45,7 @@ def main():
     args = parser.parse_args()
     
     # Convert item name to API format
-    item_index = args.item_name.lower().replace(' ', '-').replace("'", "")
+    item_index = args.item_name.lower().replace(' ', '-').replace("'", "").replace("’", "")
     
     # Fetch magic item data
     data = fetch(f"/magic-items/{item_index}")
